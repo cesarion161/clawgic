@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Demand-gated pair generation service.
@@ -74,6 +73,14 @@ public class PairGenerationService {
         int goldenCount = (int) Math.ceil(maxPairs * GOLDEN_SET_RATIO);
         int auditCount = (int) Math.ceil(maxPairs * AUDIT_PAIR_RATIO);
         int regularCount = maxPairs - goldenCount - auditCount;
+
+        // Ensure regularCount doesn't go negative for small maxPairs
+        if (regularCount < 0) {
+            // Prioritize regular pairs, then golden, then audit
+            regularCount = Math.max(1, maxPairs - 2);
+            goldenCount = maxPairs > 1 ? 1 : 0;
+            auditCount = maxPairs > 2 ? 1 : 0;
+        }
 
         log.info("Pair distribution: regular={}, golden={}, audit={}", regularCount, goldenCount, auditCount);
 
