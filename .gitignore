@@ -26,6 +26,10 @@ frontend/.DS_Store
 frontend/*.local
 frontend/.env*.local
 
+# TypeScript build cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
 # Simulation (Python)
 simulation/__pycache__/
 simulation/*.py[cod]
