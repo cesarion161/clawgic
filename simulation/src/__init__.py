@@ -36,6 +36,7 @@ from .scenarios import (
     list_scenarios,
     SCENARIOS,
 )
+from . import charts
 
 __all__ = [
     'GlobalPool',
@@ -64,6 +65,7 @@ __all__ = [
     'get_scenario',
     'list_scenarios',
     'SCENARIOS',
+    'charts',
 ]
 
 __version__ = "0.1.0"
