@@ -1,0 +1,10 @@
+{
+  "network": "devnet",
+  "mintAddress": "Example: 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+  "mintAuthority": "Example: 5FHneW1nPE5ZxKZZJeR8UrqFXqzG8qXYz8YCh5VY6KSr",
+  "tokenAccount": "Example: AyHWro8zumyZN68Mhuk6mhNUUQ2VX5qux2pMD4HnN3aE",
+  "decimals": 9,
+  "initialSupply": 1000000000,
+  "symbol": "SURGE",
+  "createdAt": "2026-02-09T12:00:00Z"
+}
