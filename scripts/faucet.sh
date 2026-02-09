@@ -13,7 +13,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Read token configuration
-MINT_ADDRESS=$(grep -oP '"mintAddress":\s*"\K[^"]+' $CONFIG_FILE)
+MINT_ADDRESS=$(grep '"mintAddress"' $CONFIG_FILE | sed 's/.*"mintAddress":[[:space:]]*"\([^"]*\)".*/\1/')
 
 if [ -z "$MINT_ADDRESS" ]; then
     echo "❌ Could not read mint address from config"

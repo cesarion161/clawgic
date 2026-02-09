@@ -22,7 +22,7 @@ solana airdrop 2 || echo "⚠️  Airdrop may have failed or rate limited, conti
 
 # Create token mint with 9 decimals
 echo "🪙 Creating SURGE token mint (9 decimals)..."
-MINT_ADDRESS=$(spl-token create-token --decimals 9 | grep -oP 'Creating token \K\w+')
+MINT_ADDRESS=$(spl-token create-token --decimals 9 | grep -o 'Creating token [^ ]*' | awk '{print $3}')
 
 if [ -z "$MINT_ADDRESS" ]; then
     echo "❌ Failed to create token mint"
@@ -33,7 +33,7 @@ echo "✅ Token mint created: $MINT_ADDRESS"
 
 # Create associated token account for the mint authority
 echo "📦 Creating token account for mint authority..."
-TOKEN_ACCOUNT=$(spl-token create-account $MINT_ADDRESS | grep -oP 'Creating account \K\w+')
+TOKEN_ACCOUNT=$(spl-token create-account $MINT_ADDRESS | grep -o 'Creating account [^ ]*' | awk '{print $3}')
 
 # Mint initial supply (1 billion tokens for testing)
 INITIAL_SUPPLY=1000000000
