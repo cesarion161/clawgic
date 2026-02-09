@@ -1,5 +1,7 @@
+'use client'
+
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 
 export function Navbar() {
   const navLinks = [
@@ -32,9 +34,7 @@ export function Navbar() {
               ))}
             </div>
           </div>
-          <Button variant="outline" size="sm">
-            Connect Wallet
-          </Button>
+          <WalletMultiButton />
         </div>
       </div>
     </nav>
