@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer as SplTransfer};
+use crate::error::MoltRankError;
 use crate::state::{GlobalPool, Market, Subscription, SubscriptionType};
 
 #[derive(Accounts)]
@@ -49,6 +50,14 @@ pub fn handler(
     amount: u64,
     subscription_type: SubscriptionType,
 ) -> Result<()> {
+    // Validate that realtime subscriptions have amount > 0
+    if subscription_type == SubscriptionType::Realtime {
+        require!(
+            amount > 0,
+            MoltRankError::InvalidSubscriptionAmount
+        );
+    }
+
     // Transfer tokens from reader to global pool (only for realtime subscriptions)
     if subscription_type == SubscriptionType::Realtime {
         let cpi_accounts = SplTransfer {
