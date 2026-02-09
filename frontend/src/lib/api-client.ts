@@ -50,6 +50,19 @@ export class ApiClient {
   async delete<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, { method: 'DELETE' })
   }
+
+  // Curator-specific endpoints
+  async getCuratorStats(wallet: string): Promise<any> {
+    return this.get(`/curator/${wallet}/stats`)
+  }
+
+  async getCuratorEvaluations(wallet: string, limit = 10): Promise<any> {
+    return this.get(`/curator/${wallet}/evaluations?limit=${limit}`)
+  }
+
+  async getLeaderboard(marketId = 1, page = 1, limit = 50): Promise<any> {
+    return this.get(`/leaderboard?marketId=${marketId}&page=${page}&limit=${limit}`)
+  }
 }
 
 export const apiClient = new ApiClient()

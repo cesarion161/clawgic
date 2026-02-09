@@ -31,3 +31,36 @@ export interface PoolHealth {
   avgEloRating: number
   timestamp: number
 }
+
+// Curator types for dashboard and leaderboard
+export interface CuratorStats {
+  wallet: string
+  earned: number
+  lost: number
+  net: number
+  curatorScore: number
+  calibrationRate: number
+  auditPassRate: number
+  alignmentStability: number
+  fraudFlags: number
+}
+
+export interface CuratorEvaluation {
+  id: string
+  pair: string
+  choice: string
+  outcome: 'win' | 'loss'
+  amount: number
+  timestamp: number
+}
+
+export interface LeaderboardEntry {
+  rank: number
+  wallet: string
+  xHandle?: string
+  curatorScore: number
+  calibrationRate: number
+  auditPassRate: number
+  totalEarned: number
+  isCurrentUser?: boolean
+}
