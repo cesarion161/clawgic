@@ -49,3 +49,4 @@ simulation/.pytest_cache/
 *.swp
 *.swo
 *~
+simulation/output/
