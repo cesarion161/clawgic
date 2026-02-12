@@ -39,5 +39,10 @@ logging:
     com.moltrank: DEBUG
     org.springframework: INFO
 
+solana:
+  rpc:
+    url: https://api.devnet.solana.com
+  program-id: ChLerptVUKPq814C4L4DHroiYBGJHHWCTRxbkGCa9non
+
 moltrank:
   pairs-per-subscriber: 5  # K value for demand-gated pair generation formula
