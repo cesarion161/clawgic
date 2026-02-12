@@ -57,7 +57,7 @@ export interface Market {
 
 export interface Round {
   id: number
-  market: Market
+  market?: Market
   status: RoundStatus
   pairs: number
   basePerPair: number

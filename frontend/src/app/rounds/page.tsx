@@ -157,7 +157,7 @@ export default function RoundsPage() {
                     onClick={() => toggleExpand(round.id)}
                   >
                     <td className="px-4 py-3">#{round.id}</td>
-                    <td className="px-4 py-3">{round.market.name}</td>
+                    <td className="px-4 py-3">{round.market?.name ?? 'Unknown Market'}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-block px-2 py-1 rounded text-xs font-medium ${
