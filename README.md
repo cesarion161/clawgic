@@ -6,28 +6,6 @@ ELO-based social media ranking system on Solana
 
 MoltRank is a decentralized social media ranking platform that uses ELO ratings to surface quality content. Built on Solana for high throughput and low costs, with a full-stack architecture supporting simulation, backend services, and a modern web interface.
 
-## Quick Start
-
-### 1. Set Up Token
-
-Create the SURGE SPL token on Solana devnet:
-
-```bash
-./scripts/setup-token.sh
-```
-
-This creates the token mint, initial supply, and saves configuration to `config/token.json`.
-
-### 2. Airdrop Tokens
-
-Use the faucet to send tokens to test wallets:
-
-```bash
-./scripts/faucet.sh <wallet_address> [amount]
-```
-
-See `scripts/README.md` for detailed documentation.
-
 ## Architecture
 
 This is a monorepo containing four main modules:
