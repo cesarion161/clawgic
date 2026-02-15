@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
+    "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=test-results/junit.xml",
     "test:watch": "vitest"
   },
   "dependencies": {

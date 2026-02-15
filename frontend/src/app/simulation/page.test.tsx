@@ -54,14 +54,19 @@ const mockSimulationData = {
   chart_7_feed_quality: [
     { round: 1, scenario: 'baseline', elo_stability: 0.5 },
     { round: 100, scenario: 'baseline', elo_stability: 0.9 },
-    { round: 1, scenario: 'high_bot', elo_stability: 0.4 },
-    { round: 100, scenario: 'high_bot', elo_stability: 0.6 },
+    { round: 1, scenario: 'bot_flood', elo_stability: 0.4 },
+    { round: 100, scenario: 'bot_flood', elo_stability: 0.6 },
   ],
 }
 
 describe('SimulationPage', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    fetchMock = vi.fn()
+    globalThis.fetch = fetchMock
   })
 
   afterEach(() => {
@@ -69,18 +74,27 @@ describe('SimulationPage', () => {
   })
 
   it('shows loading state initially', () => {
-    vi.spyOn(global, 'fetch').mockReturnValue(new Promise(() => {}) as any)
+    fetchMock.mockReturnValue(new Promise(() => {}))
 
     render(<SimulationPage />)
 
     expect(screen.getByText('Loading simulation data...')).toBeInTheDocument()
   })
 
-  it('loads and renders simulation data with all charts', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+  it('shows loading spinner', () => {
+    fetchMock.mockReturnValue(new Promise(() => {}))
+
+    render(<SimulationPage />)
+
+    const spinner = document.querySelector('.animate-spin')
+    expect(spinner).not.toBeNull()
+  })
+
+  it('renders page header after loading', async () => {
+    fetchMock.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockSimulationData),
-    } as Response)
+    })
 
     render(<SimulationPage />)
 
@@ -88,60 +102,95 @@ describe('SimulationPage', () => {
       expect(screen.getByText('Simulation Playback')).toBeInTheDocument()
     })
 
-    // Verify all 7 chart titles are rendered
-    expect(screen.getByText('GlobalPool Balance Over Time')).toBeInTheDocument()
+    expect(screen.getByText(/Reproducible results from 10,000-round simulation/)).toBeInTheDocument()
+  })
+
+  it('shows error state when fetch fails', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 404,
+    })
+
+    render(<SimulationPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Error loading simulation data')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Failed to load simulation data')).toBeInTheDocument()
+  })
+
+  it('shows error state on network failure', async () => {
+    fetchMock.mockRejectedValue(new Error('Network error'))
+
+    render(<SimulationPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Error loading simulation data')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Network error')).toBeInTheDocument()
+  })
+
+  it('renders all chart titles', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockSimulationData),
+    })
+
+    render(<SimulationPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('GlobalPool Balance Over Time')).toBeInTheDocument()
+    })
+
     expect(screen.getByText('Cumulative PnL by Agent Type')).toBeInTheDocument()
     expect(screen.getByText('New Market Bootstrap Curve')).toBeInTheDocument()
     expect(screen.getByText('Alpha Sensitivity Analysis')).toBeInTheDocument()
     expect(screen.getByText('Minority Loss Sensitivity')).toBeInTheDocument()
     expect(screen.getByText('Audit Pair Detection Rate')).toBeInTheDocument()
     expect(screen.getByText('Bot vs Human Earnings')).toBeInTheDocument()
+    expect(screen.getByText('Feed Quality / ELO Stability')).toBeInTheDocument()
   })
 
-  it('renders chart containers', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+  it('renders chart descriptions', async () => {
+    fetchMock.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockSimulationData),
-    } as Response)
+    })
+
+    render(<SimulationPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Solvency proof/)).toBeInTheDocument()
+    })
+
+    expect(screen.getByText(/Expected hierarchy/)).toBeInTheDocument()
+    expect(screen.getByText(/Curators attracted/)).toBeInTheDocument()
+  })
+
+  it('renders line chart and bar chart components', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockSimulationData),
+    })
 
     render(<SimulationPage />)
 
     await waitFor(() => {
       const lineCharts = screen.getAllByTestId('line-chart')
-      expect(lineCharts.length).toBeGreaterThanOrEqual(5)
+      expect(lineCharts.length).toBeGreaterThanOrEqual(6)
     })
 
     const barCharts = screen.getAllByTestId('bar-chart')
-    expect(barCharts.length).toBeGreaterThanOrEqual(1)
-  })
-
-  it('shows error state when fetch fails', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
-      ok: false,
-    } as Response)
-
-    render(<SimulationPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Error loading simulation data')).toBeInTheDocument()
-    })
-  })
-
-  it('shows error on network failure', async () => {
-    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'))
-
-    render(<SimulationPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Error loading simulation data')).toBeInTheDocument()
-    })
+    expect(barCharts.length).toBe(1)
   })
 
   it('renders scenario selector with options from data', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    fetchMock.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockSimulationData),
-    } as Response)
+    })
 
     render(<SimulationPage />)
 
@@ -149,34 +198,16 @@ describe('SimulationPage', () => {
       expect(screen.getByText('Scenario:')).toBeInTheDocument()
     })
 
-    // Verify scenario options
-    const select = screen.getByRole('combobox')
-    expect(select).toBeInTheDocument()
+    // Check scenarios are listed (derived from chart_7_feed_quality)
+    expect(screen.getByText('Baseline')).toBeInTheDocument()
+    expect(screen.getByText('Bot Flood')).toBeInTheDocument()
   })
 
-  it('renders Feed Quality chart with scenario filtering', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+  it('changes scenario selection', async () => {
+    fetchMock.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockSimulationData),
-    } as Response)
-
-    render(<SimulationPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Feed Quality / ELO Stability')).toBeInTheDocument()
     })
-
-    // Default scenario is 'baseline' - verify description text references it
-    expect(
-      screen.getByText(/ELO stability over time for baseline scenario/)
-    ).toBeInTheDocument()
-  })
-
-  it('changes scenario on selector change', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockSimulationData),
-    } as Response)
 
     render(<SimulationPage />)
 
@@ -184,60 +215,51 @@ describe('SimulationPage', () => {
       expect(screen.getByText('Scenario:')).toBeInTheDocument()
     })
 
-    // Change scenario
     const select = screen.getByRole('combobox')
-    fireEvent.change(select, { target: { value: 'high_bot' } })
+    fireEvent.change(select, { target: { value: 'bot_flood' } })
 
+    // Feed Quality chart description should reference the selected scenario
     await waitFor(() => {
-      expect(
-        screen.getByText(/ELO stability over time for high.bot scenario/)
-      ).toBeInTheDocument()
+      expect(screen.getByText(/bot flood scenario/)).toBeInTheDocument()
     })
   })
 
-  it('fetches data from /simulation/results.json', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+  it('fetches from correct URL', async () => {
+    fetchMock.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockSimulationData),
-    } as Response)
+    })
 
     render(<SimulationPage />)
 
-    await waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalledWith('/simulation/results.json')
-    })
-  })
-
-  it('renders description text for charts', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockSimulationData),
-    } as Response)
-
-    render(<SimulationPage />)
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Solvency proof: Pool balance remains stable/i)
-      ).toBeInTheDocument()
-      expect(
-        screen.getByText(/Expected hierarchy: Honest/i)
-      ).toBeInTheDocument()
-    })
+    expect(fetchMock).toHaveBeenCalledWith('/simulation/results.json')
   })
 
   it('renders footer with PRD reference', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    fetchMock.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockSimulationData),
-    } as Response)
+    })
 
     render(<SimulationPage />)
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/PRD Sections 6.4, 8.5, 11/)
-      ).toBeInTheDocument()
+      expect(screen.getByText(/Not screenshot artifacts/)).toBeInTheDocument()
+    })
+
+    expect(screen.getByText(/PRD Sections/)).toBeInTheDocument()
+  })
+
+  it('handles empty simulation data gracefully', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(null),
+    })
+
+    render(<SimulationPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('No simulation data available')).toBeInTheDocument()
     })
   })
 })
