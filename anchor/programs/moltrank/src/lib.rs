@@ -6,7 +6,7 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("41rM5dUSCMNSF3GyrXUH7Ykrr7d2suTxs8G2XP9ajD71");
 
 #[program]
 pub mod moltrank {

@@ -6,7 +6,10 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-moltrank = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+moltrank = "41rM5dUSCMNSF3GyrXUH7Ykrr7d2suTxs8G2XP9ajD71"
+
+[programs.devnet]
+moltrank = "41rM5dUSCMNSF3GyrXUH7Ykrr7d2suTxs8G2XP9ajD71"
 
 [registry]
 url = "https://api.apr.dev"
