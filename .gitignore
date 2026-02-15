@@ -3,6 +3,7 @@
 .claude/
 .beads/
 .logs/
+node_modules/
 
 # Anchor/Solana
 anchor/target/
