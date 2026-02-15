@@ -87,6 +87,28 @@ export class ApiClient {
   async getLeaderboard(marketId = 1, limit = 50): Promise<any> {
     return this.get(`/leaderboard?marketId=${marketId}&limit=${limit}`)
   }
+
+  // Curation endpoints
+  async getNextPair(wallet: string, marketId = 1): Promise<any> {
+    return this.get(`/pairs/next?wallet=${wallet}&marketId=${marketId}`)
+  }
+
+  async commitVote(pairId: number, data: {
+    wallet: string
+    commitmentHash: string
+    encryptedReveal: string
+    stakeAmount: number
+  }): Promise<any> {
+    return this.post(`/pairs/${pairId}/commit`, data)
+  }
+
+  async skipPair(pairId: number, wallet: string): Promise<any> {
+    return this.post(`/pairs/${pairId}/skip`, { wallet })
+  }
+
+  async getActiveRound(marketId = 1): Promise<any> {
+    return this.get(`/rounds/active?marketId=${marketId}`)
+  }
 }
 
 export const apiClient = new ApiClient()

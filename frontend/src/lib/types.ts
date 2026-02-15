@@ -130,3 +130,26 @@ export interface LeaderboardEntry {
 }
 
 export type SubscriptionType = 'REALTIME' | 'FREE_DELAY'
+
+export interface Pair {
+  id: number
+  pairId: number
+  roundId: number
+  postA: Post
+  postB: Post
+  commitDeadline: string
+  revealDeadline: string
+  isGolden: boolean
+  votesCount: number
+  createdAt: string
+}
+
+export interface ActiveRound {
+  id: number
+  roundId: number
+  status: RoundStatus
+  commitDeadline: string | null
+  revealDeadline: string | null
+  totalPairs: number
+  remainingPairs: number
+}
