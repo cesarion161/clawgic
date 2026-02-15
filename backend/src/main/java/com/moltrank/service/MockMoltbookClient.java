@@ -2,6 +2,7 @@ package com.moltrank.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -12,6 +13,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * Used as fallback when real Moltbook API is unavailable.
  */
 @Component
+@ConditionalOnMissingBean(MoltbookApiClient.class)
 public class MockMoltbookClient implements MoltbookClient {
 
     private static final Logger log = LoggerFactory.getLogger(MockMoltbookClient.class);

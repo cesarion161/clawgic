@@ -46,3 +46,5 @@ solana:
 
 moltrank:
   pairs-per-subscriber: 5  # K value for demand-gated pair generation formula
+  moltbook:
+    # api-url: https://api.moltbook.com  # Uncomment when real Moltbook API is available
