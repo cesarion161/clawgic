@@ -54,9 +54,13 @@ public class RoundOrchestratorService {
         this.autoRevealService = autoRevealService;
     }
 
+    private static final List<RoundStatus> ACTIVE_STATUSES = List.of(
+            RoundStatus.OPEN, RoundStatus.COMMIT, RoundStatus.REVEAL, RoundStatus.SETTLING);
+
     /**
-     * Scheduled task: process state transitions every minute.
-     * Checks all active rounds and transitions them based on deadlines.
+     * Scheduled task: process state transitions and create new rounds every minute.
+     * Checks all active rounds, transitions them based on deadlines, and creates
+     * new rounds for eligible markets.
      */
     @Scheduled(fixedRate = 60000) // Run every 60 seconds
     @Transactional
@@ -90,6 +94,29 @@ public class RoundOrchestratorService {
                 transitionToSettling(round);
             }
         }
+
+        // Auto-create new rounds for eligible markets
+        checkAndCreateRounds();
+    }
+
+    /**
+     * Checks all markets and creates new rounds where conditions are met:
+     * - No active round (OPEN, COMMIT, REVEAL, or SETTLING) for the market
+     * - Sufficient subscribers (>= minCurators)
+     */
+    void checkAndCreateRounds() {
+        List<Market> markets = marketRepository.findAll();
+        for (Market market : markets) {
+            List<Round> activeRounds = roundRepository.findByMarketIdAndStatusIn(
+                    market.getId(), ACTIVE_STATUSES);
+            if (activeRounds.isEmpty()) {
+                try {
+                    createNewRound(market);
+                } catch (Exception e) {
+                    log.error("Failed to auto-create round for market {}", market.getName(), e);
+                }
+            }
+        }
     }
 
     /**
@@ -103,8 +130,9 @@ public class RoundOrchestratorService {
     public Round createNewRound(Market market) {
         log.info("Creating new round for market: {}", market.getName());
 
-        // Check for existing active rounds
-        List<Round> activeRounds = roundRepository.findByMarketIdAndStatus(market.getId(), RoundStatus.OPEN);
+        // Check for existing active rounds (any non-settled status)
+        List<Round> activeRounds = roundRepository.findByMarketIdAndStatusIn(
+                market.getId(), ACTIVE_STATUSES);
         if (!activeRounds.isEmpty()) {
             log.warn("Market {} already has active rounds, skipping creation", market.getName());
             return null;
