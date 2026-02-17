@@ -83,6 +83,18 @@ describe('ApiClient', () => {
         expect.objectContaining({ method: 'DELETE' })
       )
     })
+
+    it('handles 201 response with empty body', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: () => Promise.reject(new SyntaxError('Unexpected end of JSON input')),
+      })
+
+      const result = await client.post('/pairs/1/commit', { example: true })
+
+      expect(result).toBeUndefined()
+    })
   })
 
   describe('error handling', () => {

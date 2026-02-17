@@ -34,6 +34,19 @@ class RoundControllerTest {
     @MockitoBean
     private RoundRepository roundRepository;
 
+    private static final class ByteBuddyInterceptorStub {
+    }
+
+    private static final class ProxyMarket extends Market {
+        public Object getHibernateLazyInitializer() {
+            return new ByteBuddyInterceptorStub();
+        }
+
+        public Object getHandler() {
+            return new ByteBuddyInterceptorStub();
+        }
+    }
+
     private Market buildMarket() {
         Market market = new Market();
         market.setId(1);
@@ -41,6 +54,14 @@ class RoundControllerTest {
         market.setSubmoltId("tech");
         market.setSubscriptionRevenue(1000000L);
         market.setSubscribers(5);
+        return market;
+    }
+
+    private Market buildProxyMarket() {
+        Market market = new ProxyMarket();
+        market.setId(1);
+        market.setName("tech");
+        market.setSubmoltId("tech");
         return market;
     }
 
@@ -73,6 +94,8 @@ class RoundControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].id").value(2))
+                .andExpect(jsonPath("$[0].market.id").value(1))
+                .andExpect(jsonPath("$[0].market.name").value("tech"))
                 .andExpect(jsonPath("$[0].status").value("OPEN"))
                 .andExpect(jsonPath("$[0].pairs").value(10))
                 .andExpect(jsonPath("$[1].id").value(1))
@@ -116,6 +139,7 @@ class RoundControllerTest {
         mockMvc.perform(get("/api/rounds/{id}", 1))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.market.id").value(1))
                 .andExpect(jsonPath("$.status").value("SETTLED"))
                 .andExpect(jsonPath("$.pairs").value(10))
                 .andExpect(jsonPath("$.basePerPair").value(5000000))
@@ -150,5 +174,19 @@ class RoundControllerTest {
                 .andExpect(jsonPath("$[2].status").value("REVEAL"))
                 .andExpect(jsonPath("$[3].status").value("COMMIT"))
                 .andExpect(jsonPath("$[4].status").value("OPEN"));
+    }
+
+    @Test
+    void listRounds_handlesProxyLikeMarketWithoutSerialization500() throws Exception {
+        Round round = buildRound(1, RoundStatus.OPEN, buildProxyMarket());
+
+        when(roundRepository.findByMarketId(eq(1), any(Sort.class)))
+                .thenReturn(List.of(round));
+
+        mockMvc.perform(get("/api/rounds"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].market.name").value("tech"));
     }
 }

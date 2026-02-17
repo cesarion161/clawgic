@@ -1,5 +1,6 @@
 package com.moltrank.controller;
 
+import com.moltrank.controller.dto.RoundResponse;
 import com.moltrank.model.Round;
 import com.moltrank.repository.RoundRepository;
 import org.springframework.data.domain.Sort;
@@ -28,14 +29,18 @@ public class RoundController {
      * @return List of rounds sorted by created date (descending)
      */
     @GetMapping
-    public ResponseEntity<List<Round>> listRounds(
+    public ResponseEntity<List<RoundResponse>> listRounds(
             @RequestParam(defaultValue = "1") Integer marketId) {
 
         List<Round> rounds = roundRepository.findByMarketId(
                 marketId,
                 Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        return ResponseEntity.ok(rounds);
+        List<RoundResponse> response = rounds.stream()
+                .map(RoundResponse::from)
+                .toList();
+
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -45,7 +50,7 @@ public class RoundController {
      * @return Round details including status, pairs, deadlines, and settlement hash
      */
     @GetMapping("/{id}")
-    public ResponseEntity<Round> getRoundDetail(@PathVariable Integer id) {
+    public ResponseEntity<RoundResponse> getRoundDetail(@PathVariable Integer id) {
         Round round = roundRepository.findById(id)
                 .orElse(null);
 
@@ -53,6 +58,6 @@ public class RoundController {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(round);
+        return ResponseEntity.ok(RoundResponse.from(round));
     }
 }

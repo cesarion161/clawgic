@@ -1,5 +1,6 @@
 package com.moltrank.controller;
 
+import com.moltrank.controller.dto.GoldenSetItemResponse;
 import com.moltrank.model.GoldenSetItem;
 import com.moltrank.service.GoldenSetService;
 import org.springframework.http.HttpStatus;
@@ -27,9 +28,12 @@ public class GoldenSetController {
      * @return List of all golden set items
      */
     @GetMapping
-    public ResponseEntity<List<GoldenSetItem>> getAllGoldenSetItems() {
+    public ResponseEntity<List<GoldenSetItemResponse>> getAllGoldenSetItems() {
         List<GoldenSetItem> items = goldenSetService.getAllGoldenSetItems();
-        return ResponseEntity.ok(items);
+        List<GoldenSetItemResponse> response = items.stream()
+                .map(GoldenSetItemResponse::from)
+                .toList();
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -39,9 +43,9 @@ public class GoldenSetController {
      * @return The created golden set item
      */
     @PostMapping
-    public ResponseEntity<GoldenSetItem> addGoldenSetItem(@RequestBody GoldenSetItem item) {
-        GoldenSetItem created = goldenSetService.addGoldenSetItem(item);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    public ResponseEntity<Void> addGoldenSetItem(@RequestBody GoldenSetItem item) {
+        goldenSetService.addGoldenSetItem(item);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     /**

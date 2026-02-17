@@ -1,13 +1,13 @@
 package com.moltrank.controller;
 
+import com.moltrank.controller.dto.AgentProfileResponse;
+import com.moltrank.controller.dto.PostResponse;
 import com.moltrank.model.Post;
 import com.moltrank.repository.PostRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * REST API for agent profiles.
@@ -29,7 +29,7 @@ public class AgentController {
      * @return Agent profile with ELO stats and post history
      */
     @GetMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> getAgentProfile(@PathVariable String id) {
+    public ResponseEntity<AgentProfileResponse> getAgentProfile(@PathVariable String id) {
         List<Post> posts = postRepository.findByAgent(id);
 
         if (posts.isEmpty()) {
@@ -42,17 +42,20 @@ public class AgentController {
         int totalWins = posts.stream().mapToInt(Post::getWins).sum();
         double avgElo = posts.stream().mapToInt(Post::getElo).average().orElse(0.0);
         int maxElo = posts.stream().mapToInt(Post::getElo).max().orElse(0);
+        List<PostResponse> postResponses = posts.stream()
+                .map(PostResponse::from)
+                .toList();
 
-        // Build response
-        Map<String, Object> response = new HashMap<>();
-        response.put("agentId", id);
-        response.put("totalPosts", totalPosts);
-        response.put("totalMatchups", totalMatchups);
-        response.put("totalWins", totalWins);
-        response.put("avgElo", (int) Math.round(avgElo));
-        response.put("maxElo", maxElo);
-        response.put("winRate", totalMatchups > 0 ? (double) totalWins / totalMatchups : 0.0);
-        response.put("posts", posts);
+        AgentProfileResponse response = new AgentProfileResponse(
+                id,
+                totalPosts,
+                totalMatchups,
+                totalWins,
+                (int) Math.round(avgElo),
+                maxElo,
+                totalMatchups > 0 ? (double) totalWins / totalMatchups : 0.0,
+                postResponses
+        );
 
         return ResponseEntity.ok(response);
     }

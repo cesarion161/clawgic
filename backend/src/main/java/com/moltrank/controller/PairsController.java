@@ -1,5 +1,6 @@
 package com.moltrank.controller;
 
+import com.moltrank.controller.dto.PairResponse;
 import com.moltrank.model.Commitment;
 import com.moltrank.model.Pair;
 import com.moltrank.repository.CommitmentRepository;
@@ -34,7 +35,7 @@ public class PairsController {
      * @return Next pair to curate, or 404 if no pairs available
      */
     @GetMapping("/next")
-    public ResponseEntity<Pair> getNextPair(
+    public ResponseEntity<PairResponse> getNextPair(
             @RequestParam String wallet,
             @RequestParam(defaultValue = "1") Integer marketId) {
 
@@ -46,7 +47,7 @@ public class PairsController {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(nextPair);
+        return ResponseEntity.ok(PairResponse.from(nextPair));
     }
 
     /**
@@ -57,7 +58,7 @@ public class PairsController {
      * @return Created commitment
      */
     @PostMapping("/{id}/commit")
-    public ResponseEntity<Commitment> commitPair(
+    public ResponseEntity<Void> commitPair(
             @PathVariable Integer id,
             @RequestBody Commitment commitment) {
 
@@ -71,12 +72,12 @@ public class PairsController {
 
         // Set pair reference and timestamp
         commitment.setPair(pair);
-        commitment.setCommittedAt(OffsetDateTime.now());
+        OffsetDateTime committedAt = OffsetDateTime.now();
+        commitment.setCommittedAt(committedAt);
         commitment.setRevealed(false);
 
         // Save commitment
-        Commitment created = commitmentRepository.save(commitment);
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        commitmentRepository.save(commitment);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 }

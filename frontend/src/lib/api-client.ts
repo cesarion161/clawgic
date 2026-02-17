@@ -35,7 +35,15 @@ export class ApiClient {
         throw new Error(`API request failed: ${response.status} ${response.statusText}`)
       }
 
-      return response.json()
+      try {
+        return await response.json()
+      } catch (parseError) {
+        if (response.status === 201 || response.status === 204) {
+          return undefined as T
+        }
+        console.error(`Failed to parse JSON response from ${url}:`, parseError)
+        throw new Error(`API request failed: invalid JSON response`)
+      }
     } catch (error) {
       if (error instanceof Error && error.message.includes('API request failed')) {
         throw error

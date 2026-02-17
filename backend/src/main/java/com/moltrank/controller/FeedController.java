@@ -1,5 +1,6 @@
 package com.moltrank.controller;
 
+import com.moltrank.controller.dto.PostResponse;
 import com.moltrank.model.Post;
 import com.moltrank.repository.PostRepository;
 import org.springframework.data.domain.PageRequest;
@@ -31,7 +32,7 @@ public class FeedController {
      * @return List of posts ranked by ELO (descending)
      */
     @GetMapping
-    public ResponseEntity<List<Post>> getFeed(
+    public ResponseEntity<List<PostResponse>> getFeed(
             @RequestParam Integer marketId,
             @RequestParam(defaultValue = "realtime") String type,
             @RequestParam(defaultValue = "50") Integer limit) {
@@ -47,6 +48,10 @@ public class FeedController {
         // based on subscription status and add delays for freemium users.
         // For now, we return the same feed for both types.
 
-        return ResponseEntity.ok(posts);
+        List<PostResponse> response = posts.stream()
+                .map(PostResponse::from)
+                .toList();
+
+        return ResponseEntity.ok(response);
     }
 }
