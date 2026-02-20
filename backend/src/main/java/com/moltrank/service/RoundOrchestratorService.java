@@ -12,9 +12,13 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Round orchestration service implementing the round state machine.
@@ -47,6 +51,7 @@ public class RoundOrchestratorService {
     private final MarketRepository marketRepository;
     private final PairGenerationService pairGenerationService;
     private final AutoRevealService autoRevealService;
+    private final SettlementService settlementService;
 
     private static final List<RoundStatus> ACTIVE_STATUSES = List.of(
             RoundStatus.OPEN, RoundStatus.COMMIT, RoundStatus.REVEAL, RoundStatus.SETTLING);
@@ -81,7 +86,7 @@ public class RoundOrchestratorService {
         OffsetDateTime now = OffsetDateTime.now();
 
         // Transition OPEN -> COMMIT (start of commit phase)
-        List<Round> openRounds = roundRepository.findByStatus(RoundStatus.OPEN);
+        List<Round> openRounds = findRoundsByStatus(RoundStatus.OPEN);
         for (Round round : openRounds) {
             if (round.getCommitDeadline() != null && now.isAfter(round.getStartedAt())) {
                 // For demo: automatically transition to COMMIT after round starts
@@ -91,7 +96,7 @@ public class RoundOrchestratorService {
         }
 
         // Transition COMMIT -> REVEAL (commit deadline passed)
-        List<Round> commitRounds = roundRepository.findByStatus(RoundStatus.COMMIT);
+        List<Round> commitRounds = findRoundsByStatus(RoundStatus.COMMIT);
         for (Round round : commitRounds) {
             if (round.getCommitDeadline() != null && now.isAfter(round.getCommitDeadline())) {
                 transitionToReveal(round);
@@ -99,11 +104,22 @@ public class RoundOrchestratorService {
         }
 
         // Transition REVEAL -> SETTLING (reveal deadline passed)
-        List<Round> revealRounds = roundRepository.findByStatus(RoundStatus.REVEAL);
+        List<Round> revealRounds = findRoundsByStatus(RoundStatus.REVEAL);
+        Set<Integer> transitionedToSettlingRoundIds = new HashSet<>();
         for (Round round : revealRounds) {
             if (round.getRevealDeadline() != null && now.isAfter(round.getRevealDeadline())) {
                 transitionToSettling(round);
+                transitionedToSettlingRoundIds.add(round.getId());
             }
+        }
+
+        // Retry all rounds still in SETTLING. Failed rounds remain retryable.
+        List<Round> settlingRounds = findRoundsByStatus(RoundStatus.SETTLING);
+        for (Round round : settlingRounds) {
+            if (transitionedToSettlingRoundIds.contains(round.getId())) {
+                continue;
+            }
+            settleRound(round.getId());
         }
 
         // Auto-create new rounds for eligible markets
@@ -238,34 +254,35 @@ public class RoundOrchestratorService {
         round.setUpdatedAt(OffsetDateTime.now());
         roundRepository.save(round);
 
-        // Future: trigger settlement engine
-        // settlementEngine.processRound(round);
+        scheduleSettlementAfterCommit(round.getId());
     }
 
-    /**
-     * Manually transition round to SETTLED status.
-     * Called by settlement engine after completion.
-     */
-    @Transactional
-    public void markRoundSettled(Round round) {
-        log.info("Marking round {} as SETTLED", round.getId());
-        round.setStatus(RoundStatus.SETTLED);
-        round.setSettledAt(OffsetDateTime.now());
-        round.setUpdatedAt(OffsetDateTime.now());
-        roundRepository.save(round);
+    private List<Round> findRoundsByStatus(RoundStatus status) {
+        List<Round> rounds = roundRepository.findByStatus(status);
+        return rounds != null ? rounds : List.of();
     }
 
-    /**
-     * Get all rounds for a specific market.
-     */
-    public List<Round> getRoundsByMarket(Integer marketId) {
-        return roundRepository.findByMarketId(marketId);
+    private void scheduleSettlementAfterCommit(Integer roundId) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    settleRound(roundId);
+                }
+            });
+            return;
+        }
+
+        settleRound(roundId);
     }
 
-    /**
-     * Get all rounds with a specific status.
-     */
-    public List<Round> getRoundsByStatus(RoundStatus status) {
-        return roundRepository.findByStatus(status);
+    private void settleRound(Integer roundId) {
+        try {
+            String settlementHash = settlementService.settleRound(roundId);
+            log.info("Round {} settled with hash {}", roundId, settlementHash);
+        } catch (Exception e) {
+            log.error("Settlement failed for round {}. Will retry on next scheduler cycle.",
+                    roundId, e);
+        }
     }
 }

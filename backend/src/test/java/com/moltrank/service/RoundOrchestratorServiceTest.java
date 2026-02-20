@@ -31,6 +31,7 @@ class RoundOrchestratorServiceTest {
     @Mock private MarketRepository marketRepository;
     @Mock private PairGenerationService pairGenerationService;
     @Mock private AutoRevealService autoRevealService;
+    @Mock private SettlementService settlementService;
 
     @InjectMocks
     private RoundOrchestratorService orchestrator;
@@ -279,10 +280,43 @@ class RoundOrchestratorServiceTest {
         when(roundRepository.findByStatus(RoundStatus.COMMIT)).thenReturn(List.of());
         when(roundRepository.findByStatus(RoundStatus.REVEAL)).thenReturn(List.of(revealRound));
         when(marketRepository.findAll()).thenReturn(List.of());
+        when(settlementService.settleRound(1)).thenReturn("0xhash");
 
         orchestrator.processRoundTransitions();
 
         assertEquals(RoundStatus.SETTLING, revealRound.getStatus());
+        verify(settlementService).settleRound(1);
+    }
+
+    @Test
+    void processRoundTransitions_retriesExistingSettlingRounds() {
+        Round settlingRound = buildRound(42, RoundStatus.SETTLING, market);
+
+        when(roundRepository.findByStatus(RoundStatus.OPEN)).thenReturn(List.of());
+        when(roundRepository.findByStatus(RoundStatus.COMMIT)).thenReturn(List.of());
+        when(roundRepository.findByStatus(RoundStatus.REVEAL)).thenReturn(List.of());
+        when(roundRepository.findByStatus(RoundStatus.SETTLING)).thenReturn(List.of(settlingRound));
+        when(marketRepository.findAll()).thenReturn(List.of());
+        when(settlementService.settleRound(42)).thenReturn("0xretry");
+
+        orchestrator.processRoundTransitions();
+
+        verify(settlementService).settleRound(42);
+    }
+
+    @Test
+    void processRoundTransitions_continuesWhenSettlementFails() {
+        Round settlingRound = buildRound(99, RoundStatus.SETTLING, market);
+
+        when(roundRepository.findByStatus(RoundStatus.OPEN)).thenReturn(List.of());
+        when(roundRepository.findByStatus(RoundStatus.COMMIT)).thenReturn(List.of());
+        when(roundRepository.findByStatus(RoundStatus.REVEAL)).thenReturn(List.of());
+        when(roundRepository.findByStatus(RoundStatus.SETTLING)).thenReturn(List.of(settlingRound));
+        when(marketRepository.findAll()).thenReturn(List.of());
+        when(settlementService.settleRound(99)).thenThrow(new RuntimeException("boom"));
+
+        assertDoesNotThrow(() -> orchestrator.processRoundTransitions());
+        verify(settlementService).settleRound(99);
     }
 
     @Test

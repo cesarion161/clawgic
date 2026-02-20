@@ -22,7 +22,6 @@ import static org.mockito.Mockito.*;
 /**
  * End-to-end regression test verifying the full flow:
  * ingestion -> round creation -> pair generation -> voting -> settlement -> scoring
- *
  * Uses mocked repositories to test service layer integration without DB.
  */
 @ExtendWith(MockitoExtension.class)
@@ -33,7 +32,6 @@ class EndToEndFlowTest {
     @Mock private GoldenSetItemRepository goldenSetItemRepository;
     @Mock private CommitmentRepository commitmentRepository;
     @Mock private CuratorRepository curatorRepository;
-    @Mock private IdentityRepository identityRepository;
     @Mock private GlobalPoolRepository globalPoolRepository;
     @Mock private RoundRepository roundRepository;
     @Mock private MarketRepository marketRepository;
@@ -57,7 +55,7 @@ class EndToEndFlowTest {
         pairGenerationService = new PairGenerationService(postRepository, pairRepository, goldenSetItemRepository);
         settlementService = new SettlementService(
                 pairRepository, commitmentRepository, curatorRepository,
-                identityRepository, globalPoolRepository, roundRepository,
+                globalPoolRepository, roundRepository,
                 poolService, eloService);
 
         ReflectionTestUtils.setField(pairGenerationService, "pairsPerSubscriber", 5);

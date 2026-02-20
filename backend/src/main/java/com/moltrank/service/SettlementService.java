@@ -2,9 +2,11 @@ package com.moltrank.service;
 
 import com.moltrank.model.*;
 import com.moltrank.repository.*;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -19,20 +21,18 @@ import java.util.stream.Collectors;
 /**
  * Deterministic settlement engine.
  * Pure function: same inputs always produce same outputs.
- *
  * Settlement outcomes:
  * - Majority: 100% stake back + quadratic share of (base + premium)
  * - Minority: 80% stake back, 20% forfeited
  * - Non-reveal: 0% stake back, 100% forfeited
  * - Golden Set wrong: 80% stake, alignment score decrease
  * - Audit inconsistency: 50% stake, fraud flag
- *
  * Publishes signed JSON snapshot, stores hash on-chain.
  * Idempotent: replay-safe state transitions.
- *
  * PRD Reference: Sections 4.1, 4.2, 9.3
  */
 @Service
+@RequiredArgsConstructor
 public class SettlementService {
 
     private static final Logger log = LoggerFactory.getLogger(SettlementService.class);
@@ -43,30 +43,10 @@ public class SettlementService {
     private final PairRepository pairRepository;
     private final CommitmentRepository commitmentRepository;
     private final CuratorRepository curatorRepository;
-    private final IdentityRepository identityRepository;
     private final GlobalPoolRepository globalPoolRepository;
     private final RoundRepository roundRepository;
     private final PoolService poolService;
     private final EloService eloService;
-
-    public SettlementService(
-            PairRepository pairRepository,
-            CommitmentRepository commitmentRepository,
-            CuratorRepository curatorRepository,
-            IdentityRepository identityRepository,
-            GlobalPoolRepository globalPoolRepository,
-            RoundRepository roundRepository,
-            PoolService poolService,
-            EloService eloService) {
-        this.pairRepository = pairRepository;
-        this.commitmentRepository = commitmentRepository;
-        this.curatorRepository = curatorRepository;
-        this.identityRepository = identityRepository;
-        this.globalPoolRepository = globalPoolRepository;
-        this.roundRepository = roundRepository;
-        this.poolService = poolService;
-        this.eloService = eloService;
-    }
 
     /**
      * Settle a round. Idempotent - can be called multiple times safely.
@@ -74,7 +54,7 @@ public class SettlementService {
      * @param roundId ID of the round to settle
      * @return Settlement hash
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String settleRound(Integer roundId) {
         Round round = roundRepository.findById(roundId)
                 .orElseThrow(() -> new IllegalArgumentException("Round not found: " + roundId));
@@ -179,7 +159,7 @@ public class SettlementService {
 
             PairWinner choice = commitment.getChoice();
             voteStakes.merge(choice, commitment.getStake(), Long::sum);
-            voteGroups.computeIfAbsent(choice, k -> new ArrayList<>()).add(commitment);
+            voteGroups.computeIfAbsent(choice, _ -> new ArrayList<>()).add(commitment);
             revealedCount++;
 
             // Get curator score for weighting
@@ -250,12 +230,10 @@ public class SettlementService {
                     totalSlashed += penalty;
 
                     // Decrease alignment score
-                    if (curator != null) {
-                        BigDecimal newAlignment = curator.getAlignmentStability()
-                                .subtract(new BigDecimal("0.05"))
-                                .max(BigDecimal.ZERO);
-                        curator.setAlignmentStability(newAlignment);
-                    }
+                    BigDecimal newAlignment = curator.getAlignmentStability()
+                            .subtract(new BigDecimal("0.05"))
+                            .max(BigDecimal.ZERO);
+                    curator.setAlignmentStability(newAlignment);
                 }
 
                 // Check audit inconsistency
@@ -265,7 +243,7 @@ public class SettlementService {
                 }
 
                 // Calculate quadratic reward share
-                Integer identityId = curator != null ? curator.getIdentityId() : null;
+                Integer identityId = curator.getIdentityId();
                 long identityStake = identityId != null ? identityStakes.getOrDefault(identityId, 0L) : commitment.getStake();
                 double sqrtStake = Math.sqrt(identityStake);
                 long reward = (long) (pairReward * (sqrtStake / totalSqrtStake));
@@ -273,11 +251,9 @@ public class SettlementService {
                 long totalPayout = stakeReturn + reward;
                 totalRewards += totalPayout;
 
-                if (curator != null) {
-                    curator.setEarned(curator.getEarned() + reward);
-                    curator.setUpdatedAt(OffsetDateTime.now());
-                    curatorRepository.save(curator);
-                }
+                curator.setEarned(curator.getEarned() + reward);
+                curator.setUpdatedAt(OffsetDateTime.now());
+                curatorRepository.save(curator);
             }
         }
 
@@ -294,11 +270,9 @@ public class SettlementService {
                 totalRewards += stakeReturn;
 
                 Curator curator = getCurator(commitment.getCuratorWallet(), pair.getRound().getMarket().getId());
-                if (curator != null) {
-                    curator.setLost(curator.getLost() + penalty);
-                    curator.setUpdatedAt(OffsetDateTime.now());
-                    curatorRepository.save(curator);
-                }
+                curator.setLost(curator.getLost() + penalty);
+                curator.setUpdatedAt(OffsetDateTime.now());
+                curatorRepository.save(curator);
             }
         }
 
@@ -313,11 +287,9 @@ public class SettlementService {
                 totalSlashed += commitment.getStake();
 
                 Curator curator = getCurator(wallet, pair.getRound().getMarket().getId());
-                if (curator != null) {
-                    curator.setLost(curator.getLost() + commitment.getStake());
-                    curator.setUpdatedAt(OffsetDateTime.now());
-                    curatorRepository.save(curator);
-                }
+                curator.setLost(curator.getLost() + commitment.getStake());
+                curator.setUpdatedAt(OffsetDateTime.now());
+                curatorRepository.save(curator);
             }
         }
 
@@ -335,13 +307,10 @@ public class SettlementService {
         Map<Integer, Long> identityStakes = new HashMap<>();
 
         for (Commitment commitment : commitments) {
-            Curator curator = curatorRepository.findById(
+            curatorRepository.findById(
                     new CuratorId(commitment.getCuratorWallet(), commitment.getPair().getRound().getMarket().getId())
-            ).orElse(null);
+            ).ifPresent(curator -> identityStakes.merge(curator.getIdentityId(), commitment.getStake(), Long::sum));
 
-            if (curator != null) {
-                identityStakes.merge(curator.getIdentityId(), commitment.getStake(), Long::sum);
-            }
         }
 
         return identityStakes;
