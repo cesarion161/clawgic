@@ -255,6 +255,34 @@ describe('ApiClient', () => {
         expect.any(Object)
       )
     })
+
+    it('commitVote posts frontend payload contract to commit endpoint', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: () => Promise.reject(new SyntaxError('Unexpected end of JSON input')),
+      })
+
+      await client.commitVote(7, {
+        wallet: 'wallet-123',
+        commitmentHash: '0xabc',
+        encryptedReveal: 'ciphertext',
+        stakeAmount: 42,
+      })
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:8080/api/pairs/7/commit',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            wallet: 'wallet-123',
+            commitmentHash: '0xabc',
+            encryptedReveal: 'ciphertext',
+            stakeAmount: 42,
+          }),
+        })
+      )
+    })
   })
 
   describe('constructor', () => {

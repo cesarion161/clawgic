@@ -1,9 +1,11 @@
 package com.moltrank.controller;
 
+import com.moltrank.controller.dto.CommitPairRequest;
 import com.moltrank.controller.dto.PairResponse;
 import com.moltrank.model.Commitment;
 import com.moltrank.model.Pair;
 import com.moltrank.repository.CommitmentRepository;
+import com.moltrank.repository.IdentityRepository;
 import com.moltrank.repository.PairRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,11 +22,14 @@ public class PairsController {
 
     private final PairRepository pairRepository;
     private final CommitmentRepository commitmentRepository;
+    private final IdentityRepository identityRepository;
 
     public PairsController(PairRepository pairRepository,
-                           CommitmentRepository commitmentRepository) {
+                           CommitmentRepository commitmentRepository,
+                           IdentityRepository identityRepository) {
         this.pairRepository = pairRepository;
         this.commitmentRepository = commitmentRepository;
+        this.identityRepository = identityRepository;
     }
 
     /**
@@ -54,13 +59,13 @@ public class PairsController {
      * Submit commitment for a pair.
      *
      * @param id The pair ID
-     * @param commitment The commitment data
+     * @param request The commitment pair request data
      * @return Created commitment
      */
     @PostMapping("/{id}/commit")
     public ResponseEntity<Void> commitPair(
             @PathVariable Integer id,
-            @RequestBody Commitment commitment) {
+            @RequestBody CommitPairRequest request) {
 
         // Verify pair exists
         Pair pair = pairRepository.findById(id)
@@ -69,6 +74,20 @@ public class PairsController {
         if (pair == null) {
             return ResponseEntity.notFound().build();
         }
+
+        if (!request.isValid()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (identityRepository.findByWallet(request.wallet()).isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Commitment commitment = new Commitment();
+        commitment.setCuratorWallet(request.wallet());
+        commitment.setHash(request.commitmentHash());
+        commitment.setStake(request.stakeAmount());
+        commitment.setEncryptedReveal(request.encryptedReveal());
 
         // Set pair reference and timestamp
         commitment.setPair(pair);

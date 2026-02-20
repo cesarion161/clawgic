@@ -2,8 +2,10 @@ package com.moltrank.controller;
 
 import com.moltrank.model.*;
 import com.moltrank.repository.CommitmentRepository;
+import com.moltrank.repository.IdentityRepository;
 import com.moltrank.repository.PairRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -14,7 +16,9 @@ import java.time.OffsetDateTime;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -34,6 +38,9 @@ class PairsControllerTest {
 
     @MockitoBean
     private CommitmentRepository commitmentRepository;
+
+    @MockitoBean
+    private IdentityRepository identityRepository;
 
     private static final String WALLET = "4Nd1mYQzvgV8Vr3Z3nYb7pD6T8K9jF2eqWxY1S3Qh5Ro";
 
@@ -98,6 +105,15 @@ class PairsControllerTest {
         return pair;
     }
 
+    private Identity buildIdentity(String wallet) {
+        Identity identity = new Identity();
+        identity.setId(1);
+        identity.setWallet(wallet);
+        identity.setXAccount("test-account");
+        identity.setVerified(true);
+        return identity;
+    }
+
     @Test
     void getNextPair_returnsPairForCurator() throws Exception {
         Pair pair = buildPair(false);
@@ -131,6 +147,7 @@ class PairsControllerTest {
     void commitPair_createsCommitment() throws Exception {
         Pair pair = buildPair(false);
         when(pairRepository.findById(1)).thenReturn(Optional.of(pair));
+        when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
 
         Commitment saved = new Commitment();
         saved.setId(1);
@@ -157,6 +174,91 @@ class PairsControllerTest {
                         .content(requestBody))
                 .andExpect(status().isCreated())
                 .andExpect(content().string(""));
+
+        ArgumentCaptor<Commitment> captor = ArgumentCaptor.forClass(Commitment.class);
+        verify(commitmentRepository).save(captor.capture());
+        Commitment persisted = captor.getValue();
+        assertEquals(WALLET, persisted.getCuratorWallet());
+        assertEquals(saved.getHash(), persisted.getHash());
+        assertEquals(saved.getStake(), persisted.getStake());
+        assertEquals(saved.getEncryptedReveal(), persisted.getEncryptedReveal());
+        assertFalse(persisted.getRevealed());
+        assertNotNull(persisted.getCommittedAt());
+        assertSame(pair, persisted.getPair());
+    }
+
+    @Test
+    void commitPair_acceptsFrontendPayloadContract() throws Exception {
+        Pair pair = buildPair(false);
+        when(pairRepository.findById(1)).thenReturn(Optional.of(pair));
+        when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
+        when(commitmentRepository.save(any(Commitment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        String commitmentHash = "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab";
+        String requestBody = """
+                {
+                    "wallet": "%s",
+                    "commitmentHash": "%s",
+                    "stakeAmount": 1000000000,
+                    "encryptedReveal": "encrypted-payload"
+                }
+                """.formatted(WALLET, commitmentHash);
+
+        mockMvc.perform(post("/api/pairs/{id}/commit", 1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated())
+                .andExpect(content().string(""));
+
+        ArgumentCaptor<Commitment> captor = ArgumentCaptor.forClass(Commitment.class);
+        verify(commitmentRepository).save(captor.capture());
+        Commitment persisted = captor.getValue();
+        assertEquals(WALLET, persisted.getCuratorWallet());
+        assertEquals(commitmentHash, persisted.getHash());
+        assertEquals(1000000000L, persisted.getStake());
+        assertEquals("encrypted-payload", persisted.getEncryptedReveal());
+        assertFalse(persisted.getRevealed());
+    }
+
+    @Test
+    void commitPair_returns400ForInvalidPayload() throws Exception {
+        Pair pair = buildPair(false);
+        when(pairRepository.findById(1)).thenReturn(Optional.of(pair));
+
+        String requestBody = """
+                {
+                    "wallet": "%s",
+                    "commitmentHash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab",
+                    "stakeAmount": 0,
+                    "encryptedReveal": ""
+                }
+                """.formatted(WALLET);
+
+        mockMvc.perform(post("/api/pairs/{id}/commit", 1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void commitPair_returns400WhenWalletIdentityDoesNotExist() throws Exception {
+        Pair pair = buildPair(false);
+        when(pairRepository.findById(1)).thenReturn(Optional.of(pair));
+        when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.empty());
+
+        String requestBody = """
+                {
+                    "wallet": "%s",
+                    "commitmentHash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab",
+                    "stakeAmount": 1000000000,
+                    "encryptedReveal": "encrypted-payload"
+                }
+                """.formatted(WALLET);
+
+        mockMvc.perform(post("/api/pairs/{id}/commit", 1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -196,6 +298,7 @@ class PairsControllerTest {
     void commitPair_handlesProxyLikeEntityGraphWithoutSerialization500() throws Exception {
         Pair pair = buildPair(true);
         when(pairRepository.findById(1)).thenReturn(Optional.of(pair));
+        when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
 
         Commitment saved = new Commitment();
         saved.setId(1);
