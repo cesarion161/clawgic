@@ -28,6 +28,10 @@ public final class CommitmentCodec {
 
     public static RevealPayload decodeRevealPayloadBase64(String encodedPayload) {
         byte[] payload = Base64.getDecoder().decode(encodedPayload);
+        return decodeRevealPayload(payload);
+    }
+
+    public static RevealPayload decodeRevealPayload(byte[] payload) {
         if (payload.length != REVEAL_PAYLOAD_BYTES) {
             throw new IllegalArgumentException(
                     "Invalid reveal payload length: expected " + REVEAL_PAYLOAD_BYTES + ", got " + payload.length);
@@ -64,10 +68,7 @@ public final class CommitmentCodec {
             throw new IllegalArgumentException("Nonce must be " + NONCE_BYTES + " bytes");
         }
 
-        byte[] walletBytes = decodeBase58(wallet);
-        if (walletBytes.length != SOLANA_PUBKEY_BYTES) {
-            throw new IllegalArgumentException("Wallet must decode to 32 bytes");
-        }
+        byte[] walletBytes = decodeWalletPublicKey(wallet);
 
         byte[] pairIdBytes = ByteBuffer.allocate(4)
                 .order(ByteOrder.LITTLE_ENDIAN)
@@ -94,6 +95,14 @@ public final class CommitmentCodec {
         Keccak.Digest256 digest = new Keccak.Digest256();
         byte[] hash = digest.digest(preimage);
         return "0x" + toHex(hash);
+    }
+
+    public static byte[] decodeWalletPublicKey(String wallet) {
+        byte[] walletBytes = decodeBase58(wallet);
+        if (walletBytes.length != SOLANA_PUBKEY_BYTES) {
+            throw new IllegalArgumentException("Wallet must decode to 32 bytes");
+        }
+        return walletBytes;
     }
 
     public static String normalizeCommitmentHash(String hash) {

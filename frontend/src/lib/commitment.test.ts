@@ -1,10 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { sha256 } from '@noble/hashes/sha2.js'
 import {
+  buildCommitAuthMessage,
+  buildRevealPayload,
+  commitRequestNonceHex,
   computeCommitmentHashHex,
   decodeRevealPayloadBase64,
+  encryptRevealPayloadWithSignature,
   encodeRevealPayloadBase64,
+  generateCommitRequestNonce,
   nonceFromHex,
   nonceHex,
   normalizeCommitmentHash,
@@ -68,5 +74,69 @@ describe('commitment codec', () => {
         nonce,
       }),
     ).toThrow('stakeAmount must be a non-negative safe integer')
+  })
+
+  it('builds canonical commit auth message with normalized hash', () => {
+    const message = buildCommitAuthMessage({
+      wallet: vectors[0].wallet,
+      pairId: vectors[0].pairId,
+      commitmentHash: vectors[0].commitmentHash.toUpperCase(),
+      stakeAmount: vectors[0].stakeAmount,
+      signedAtEpochSeconds: 1730000000,
+      requestNonceHex: '00112233445566778899aabbccddeeff',
+    })
+
+    expect(message).toContain('moltrank-commit-v1|')
+    expect(message).toContain(`wallet=${vectors[0].wallet}`)
+    expect(message).toContain(`pairId=${vectors[0].pairId}`)
+    expect(message).toContain(`hash=${vectors[0].commitmentHash}`)
+    expect(message).toContain(`stake=${vectors[0].stakeAmount}`)
+    expect(message).toContain('signedAt=1730000000')
+    expect(message).toContain('nonce=00112233445566778899aabbccddeeff')
+  })
+
+  it('encrypts reveal payload with signature-derived key and decrypts with matching aad', async () => {
+    const nonce = nonceFromHex(vectors[0].nonceHex)
+    const authMessage = buildCommitAuthMessage({
+      wallet: vectors[0].wallet,
+      pairId: vectors[0].pairId,
+      commitmentHash: vectors[0].commitmentHash,
+      stakeAmount: vectors[0].stakeAmount,
+      signedAtEpochSeconds: 1730000000,
+      requestNonceHex: '00112233445566778899aabbccddeeff',
+    })
+    const signature = new Uint8Array(64).fill(7)
+
+    const { encryptedRevealBase64, revealIvBase64 } = await encryptRevealPayloadWithSignature({
+      choice: 'A',
+      nonce,
+      signature,
+      authMessage,
+    })
+
+    expect(encryptedRevealBase64).not.toBe(encodeRevealPayloadBase64('A', nonce))
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      sha256(signature),
+      { name: 'AES-GCM' },
+      false,
+      ['decrypt'],
+    )
+    const iv = Uint8Array.from(Buffer.from(revealIvBase64, 'base64').values())
+    const ciphertext = Uint8Array.from(Buffer.from(encryptedRevealBase64, 'base64').values())
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(authMessage) },
+      key,
+      ciphertext,
+    )
+
+    expect(new Uint8Array(decrypted)).toEqual(buildRevealPayload('A', nonce))
+  })
+
+  it('generates request nonce hex with expected size', () => {
+    const nonce = generateCommitRequestNonce()
+    const hex = commitRequestNonceHex(nonce)
+    expect(hex).toMatch(/^[0-9a-f]{32}$/)
   })
 })

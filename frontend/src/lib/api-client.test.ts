@@ -267,6 +267,10 @@ describe('ApiClient', () => {
         wallet: 'wallet-123',
         commitmentHash: '0xabc',
         encryptedReveal: 'ciphertext',
+        revealIv: 'iv',
+        signature: 'sig',
+        signedAt: 1730000000,
+        requestNonce: '00112233445566778899aabbccddeeff',
         stakeAmount: 42,
       })
 
@@ -278,6 +282,10 @@ describe('ApiClient', () => {
             wallet: 'wallet-123',
             commitmentHash: '0xabc',
             encryptedReveal: 'ciphertext',
+            revealIv: 'iv',
+            signature: 'sig',
+            signedAt: 1730000000,
+            requestNonce: '00112233445566778899aabbccddeeff',
             stakeAmount: 42,
           }),
         })

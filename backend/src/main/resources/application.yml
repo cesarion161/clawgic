@@ -59,5 +59,14 @@ moltrank:
     penalty-enforcement-enabled: true
     penalty-initial-delay-ms: 60000
     penalty-interval-ms: 60000
+  commit-security:
+    max-signature-age-seconds: 300
+    max-future-skew-seconds: 60
+    replay-window-seconds: 900
+    allow-legacy-unsigned-commits: false
+    allow-legacy-reveal-decode: true
+    active-storage-key-id: v1
+    storage-keys:
+      v1: ${MOLTRANK_COMMIT_STORAGE_KEY_V1_BASE64:bW9sdHJhbmstY29tbWl0LWtleS12MS0zMi1ieXRlcyE=}
   moltbook:
     # api-url: https://api.moltbook.com  # Uncomment when real Moltbook API is available

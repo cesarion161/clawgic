@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { webcrypto } from 'node:crypto'
 import CuratePage from './page'
 
 // Mock the API client module
@@ -23,8 +24,17 @@ vi.mock('@/hooks/use-identity', () => ({
   useIdentity: () => mockUseIdentity(),
 }))
 
+const mockSignMessage = vi.fn()
+vi.mock('@solana/wallet-adapter-react', () => ({
+  useWallet: () => ({
+    signMessage: (...args: any[]) => mockSignMessage(...args),
+  }),
+}))
+
 Object.defineProperty(globalThis, 'crypto', {
+  configurable: true,
   value: {
+    subtle: webcrypto.subtle,
     getRandomValues: (arr: Uint8Array) => {
       for (let i = 0; i < arr.length; i++) arr[i] = i
       return arr
@@ -96,6 +106,7 @@ describe('CuratePage', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     mockUseIdentity.mockReturnValue(defaultIdentity)
+    mockSignMessage.mockResolvedValue(new Uint8Array(64).fill(7))
     vi.useFakeTimers({ shouldAdvanceTime: true })
   })
 
@@ -253,6 +264,10 @@ describe('CuratePage', () => {
         wallet: MOCK_WALLET,
         commitmentHash: expect.stringMatching(/^0x[0-9a-f]{64}$/),
         encryptedReveal: expect.any(String),
+        revealIv: expect.any(String),
+        signature: expect.any(String),
+        signedAt: expect.any(Number),
+        requestNonce: expect.stringMatching(/^[0-9a-f]{32}$/),
         stakeAmount: 50,
       }))
     })

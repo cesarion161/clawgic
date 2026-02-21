@@ -105,6 +105,10 @@ export class ApiClient {
     wallet: string
     commitmentHash: string
     encryptedReveal: string
+    revealIv: string
+    signature: string
+    signedAt: number
+    requestNonce: string
     stakeAmount: number
   }): Promise<any> {
     return this.post(`/pairs/${pairId}/commit`, data)

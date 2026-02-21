@@ -4,6 +4,7 @@ import com.moltrank.model.*;
 import com.moltrank.repository.CommitmentRepository;
 import com.moltrank.repository.IdentityRepository;
 import com.moltrank.repository.PairRepository;
+import com.moltrank.service.CommitSecurityService;
 import com.moltrank.service.PairSelectionService;
 import com.moltrank.service.PairSkipService;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import java.time.OffsetDateTime;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.*;
@@ -50,7 +52,12 @@ class PairsControllerTest {
     @MockitoBean
     private PairSkipService pairSkipService;
 
+    @MockitoBean
+    private CommitSecurityService commitSecurityService;
+
     private static final String WALLET = "4Nd1mYQzvgV8Vr3Z3nYb7pD6T8K9jF2eqWxY1S3Qh5Ro";
+    private static final String NORMALIZED_HASH = "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+    private static final String STORAGE_ENVELOPE = "{\"version\":\"v2\",\"alg\":\"AES-256-GCM\",\"kid\":\"v1\",\"iv\":\"AA==\",\"ct\":\"AA==\"}";
 
     private static final class ByteBuddyInterceptorStub {
     }
@@ -157,14 +164,16 @@ class PairsControllerTest {
         Pair pair = buildPair(false);
         when(pairRepository.findById(1)).thenReturn(Optional.of(pair));
         when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
+        when(commitSecurityService.secureCommitPayload(eq(1), any()))
+                .thenReturn(new CommitSecurityService.SecuredCommitmentPayload(NORMALIZED_HASH, STORAGE_ENVELOPE));
 
         Commitment saved = new Commitment();
         saved.setId(1);
         saved.setPair(pair);
         saved.setCuratorWallet(WALLET);
-        saved.setHash("0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890");
+        saved.setHash(NORMALIZED_HASH);
         saved.setStake(1000000000L);
-        saved.setEncryptedReveal("encrypted-payload");
+        saved.setEncryptedReveal(STORAGE_ENVELOPE);
         saved.setRevealed(false);
 
         when(commitmentRepository.save(any(Commitment.class))).thenReturn(saved);
@@ -172,11 +181,15 @@ class PairsControllerTest {
         String requestBody = """
                 {
                     "curatorWallet": "%s",
-                    "hash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+                    "hash": "%s",
                     "stake": 1000000000,
-                    "encryptedReveal": "encrypted-payload"
+                    "encryptedReveal": "encrypted-payload",
+                    "revealIv": "AAAAAAAAAAAAAAAA",
+                    "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+                    "signedAt": 1730000000,
+                    "requestNonce": "00112233445566778899aabbccddeeff"
                 }
-                """.formatted(WALLET);
+                """.formatted(WALLET, NORMALIZED_HASH);
 
         mockMvc.perform(post("/api/pairs/{id}/commit", 1)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -201,17 +214,22 @@ class PairsControllerTest {
         Pair pair = buildPair(false);
         when(pairRepository.findById(1)).thenReturn(Optional.of(pair));
         when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
+        when(commitSecurityService.secureCommitPayload(eq(1), any()))
+                .thenReturn(new CommitSecurityService.SecuredCommitmentPayload(NORMALIZED_HASH, STORAGE_ENVELOPE));
         when(commitmentRepository.save(any(Commitment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        String commitmentHash = "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
         String requestBody = """
                 {
                     "wallet": "%s",
                     "commitmentHash": "%s",
                     "stakeAmount": 1000000000,
-                    "encryptedReveal": "encrypted-payload"
+                    "encryptedReveal": "encrypted-payload",
+                    "revealIv": "AAAAAAAAAAAAAAAA",
+                    "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+                    "signedAt": 1730000000,
+                    "requestNonce": "00112233445566778899aabbccddeeff"
                 }
-                """.formatted(WALLET, commitmentHash);
+                """.formatted(WALLET, NORMALIZED_HASH);
 
         mockMvc.perform(post("/api/pairs/{id}/commit", 1)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -223,9 +241,9 @@ class PairsControllerTest {
         verify(commitmentRepository).save(captor.capture());
         Commitment persisted = captor.getValue();
         assertEquals(WALLET, persisted.getCuratorWallet());
-        assertEquals(commitmentHash, persisted.getHash());
+        assertEquals(NORMALIZED_HASH, persisted.getHash());
         assertEquals(1000000000L, persisted.getStake());
-        assertEquals("encrypted-payload", persisted.getEncryptedReveal());
+        assertEquals(STORAGE_ENVELOPE, persisted.getEncryptedReveal());
         assertFalse(persisted.getRevealed());
     }
 
@@ -254,13 +272,21 @@ class PairsControllerTest {
         Pair pair = buildPair(false);
         when(pairRepository.findById(1)).thenReturn(Optional.of(pair));
         when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
+        when(commitSecurityService.secureCommitPayload(eq(1), any())).thenThrow(
+                new CommitSecurityService.CommitSecurityException(
+                        CommitSecurityService.CommitSecurityError.BAD_REQUEST,
+                        "invalid hash"));
 
         String requestBody = """
                 {
                     "wallet": "%s",
                     "commitmentHash": "not-a-hash",
                     "stakeAmount": 1000000000,
-                    "encryptedReveal": "encrypted-payload"
+                    "encryptedReveal": "encrypted-payload",
+                    "revealIv": "AAAAAAAAAAAAAAAA",
+                    "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+                    "signedAt": 1730000000,
+                    "requestNonce": "00112233445566778899aabbccddeeff"
                 }
                 """.formatted(WALLET);
 
@@ -354,14 +380,16 @@ class PairsControllerTest {
         Pair pair = buildPair(true);
         when(pairRepository.findById(1)).thenReturn(Optional.of(pair));
         when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
+        when(commitSecurityService.secureCommitPayload(eq(1), any()))
+                .thenReturn(new CommitSecurityService.SecuredCommitmentPayload(NORMALIZED_HASH, STORAGE_ENVELOPE));
 
         Commitment saved = new Commitment();
         saved.setId(1);
         saved.setPair(pair);
         saved.setCuratorWallet(WALLET);
-        saved.setHash("0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890");
+        saved.setHash(NORMALIZED_HASH);
         saved.setStake(1000000000L);
-        saved.setEncryptedReveal("encrypted-payload");
+        saved.setEncryptedReveal(STORAGE_ENVELOPE);
         saved.setRevealed(false);
 
         when(commitmentRepository.save(any(Commitment.class))).thenReturn(saved);
@@ -369,17 +397,79 @@ class PairsControllerTest {
         String requestBody = """
                 {
                     "curatorWallet": "%s",
-                    "hash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+                    "hash": "%s",
                     "stake": 1000000000,
-                    "encryptedReveal": "encrypted-payload"
+                    "encryptedReveal": "encrypted-payload",
+                    "revealIv": "AAAAAAAAAAAAAAAA",
+                    "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+                    "signedAt": 1730000000,
+                    "requestNonce": "00112233445566778899aabbccddeeff"
                 }
-                """.formatted(WALLET);
+                """.formatted(WALLET, NORMALIZED_HASH);
 
         mockMvc.perform(post("/api/pairs/{id}/commit", 1)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isCreated())
                 .andExpect(content().string(""));
+    }
+
+    @Test
+    void commitPair_returns401ForInvalidSignature() throws Exception {
+        Pair pair = buildPair(false);
+        when(pairRepository.findById(1)).thenReturn(Optional.of(pair));
+        when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
+        when(commitSecurityService.secureCommitPayload(eq(1), any())).thenThrow(
+                new CommitSecurityService.CommitSecurityException(
+                        CommitSecurityService.CommitSecurityError.UNAUTHORIZED,
+                        "signature invalid"));
+
+        String requestBody = """
+                {
+                    "wallet": "%s",
+                    "commitmentHash": "%s",
+                    "stakeAmount": 1000000000,
+                    "encryptedReveal": "encrypted-payload",
+                    "revealIv": "AAAAAAAAAAAAAAAA",
+                    "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+                    "signedAt": 1730000000,
+                    "requestNonce": "00112233445566778899aabbccddeeff"
+                }
+                """.formatted(WALLET, NORMALIZED_HASH);
+
+        mockMvc.perform(post("/api/pairs/{id}/commit", 1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void commitPair_returns409ForReplayNonce() throws Exception {
+        Pair pair = buildPair(false);
+        when(pairRepository.findById(1)).thenReturn(Optional.of(pair));
+        when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
+        when(commitSecurityService.secureCommitPayload(eq(1), any())).thenThrow(
+                new CommitSecurityService.CommitSecurityException(
+                        CommitSecurityService.CommitSecurityError.REPLAY,
+                        "replay"));
+
+        String requestBody = """
+                {
+                    "wallet": "%s",
+                    "commitmentHash": "%s",
+                    "stakeAmount": 1000000000,
+                    "encryptedReveal": "encrypted-payload",
+                    "revealIv": "AAAAAAAAAAAAAAAA",
+                    "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+                    "signedAt": 1730000000,
+                    "requestNonce": "00112233445566778899aabbccddeeff"
+                }
+                """.formatted(WALLET, NORMALIZED_HASH);
+
+        mockMvc.perform(post("/api/pairs/{id}/commit", 1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isConflict());
     }
 
     @Test

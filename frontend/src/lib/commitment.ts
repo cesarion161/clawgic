@@ -1,5 +1,6 @@
 import { PublicKey } from '@solana/web3.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
+import { sha256 } from '@noble/hashes/sha2.js'
 
 export type CommitmentChoice = 'A' | 'B'
 
@@ -13,9 +14,34 @@ export interface CommitmentHashInput {
 
 export const NONCE_SIZE_BYTES = 32
 export const REVEAL_PAYLOAD_SIZE_BYTES = 1 + NONCE_SIZE_BYTES
+export const COMMIT_REQUEST_NONCE_SIZE_BYTES = 16
+export const COMMIT_REVEAL_IV_SIZE_BYTES = 12
+const COMMIT_AUTH_MESSAGE_PREFIX = 'moltrank-commit-v1'
+
+export interface CommitAuthMessageInput {
+  wallet: string
+  pairId: number
+  commitmentHash: string
+  stakeAmount: number
+  signedAtEpochSeconds: number
+  requestNonceHex: string
+}
+
+export interface EncryptRevealInput {
+  choice: CommitmentChoice
+  nonce: Uint8Array
+  signature: Uint8Array
+  authMessage: string
+}
 
 export function generateNonce(): Uint8Array {
   const nonce = new Uint8Array(NONCE_SIZE_BYTES)
+  crypto.getRandomValues(nonce)
+  return nonce
+}
+
+export function generateCommitRequestNonce(): Uint8Array {
+  const nonce = new Uint8Array(COMMIT_REQUEST_NONCE_SIZE_BYTES)
   crypto.getRandomValues(nonce)
   return nonce
 }
@@ -37,6 +63,39 @@ export function encodeRevealPayloadBase64(
   nonce: Uint8Array,
 ): string {
   return bytesToBase64(buildRevealPayload(choice, nonce))
+}
+
+export async function encryptRevealPayloadWithSignature(input: EncryptRevealInput): Promise<{
+  encryptedRevealBase64: string
+  revealIvBase64: string
+}> {
+  const revealPayload = buildRevealPayload(input.choice, input.nonce)
+  const keyBytes = deriveClientRevealKey(input.signature)
+  const iv = new Uint8Array(COMMIT_REVEAL_IV_SIZE_BYTES)
+  crypto.getRandomValues(iv)
+
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt'])
+  const ciphertext = await crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv,
+      additionalData: utf8Bytes(input.authMessage),
+    },
+    key,
+    revealPayload,
+  )
+
+  return {
+    encryptedRevealBase64: bytesToBase64(new Uint8Array(ciphertext)),
+    revealIvBase64: bytesToBase64(iv),
+  }
+}
+
+export function buildCommitAuthMessage(input: CommitAuthMessageInput): string {
+  const normalizedHash = normalizeCommitmentHash(input.commitmentHash)
+  const requestNonce = normalizeRequestNonceHex(input.requestNonceHex)
+
+  return `${COMMIT_AUTH_MESSAGE_PREFIX}|wallet=${input.wallet}|pairId=${input.pairId}|hash=${normalizedHash}|stake=${input.stakeAmount}|signedAt=${input.signedAtEpochSeconds}|nonce=${requestNonce}`
 }
 
 export function decodeRevealPayloadBase64(encodedPayload: string): {
@@ -109,6 +168,13 @@ export function nonceHex(nonce: Uint8Array): string {
   return bytesToHex(nonce)
 }
 
+export function commitRequestNonceHex(nonce: Uint8Array): string {
+  if (nonce.length !== COMMIT_REQUEST_NONCE_SIZE_BYTES) {
+    throw new Error(`Commit request nonce must be ${COMMIT_REQUEST_NONCE_SIZE_BYTES} bytes`)
+  }
+  return bytesToHex(nonce)
+}
+
 export function nonceFromHex(hex: string): Uint8Array {
   if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
     throw new Error('Nonce hex must be 64 hex chars')
@@ -135,6 +201,14 @@ function validateNonce(nonce: Uint8Array): void {
   if (nonce.length !== NONCE_SIZE_BYTES) {
     throw new Error(`Nonce must be ${NONCE_SIZE_BYTES} bytes`)
   }
+}
+
+function normalizeRequestNonceHex(value: string): string {
+  const normalized = value.trim().toLowerCase()
+  if (!/^[0-9a-f]{32}$/.test(normalized)) {
+    throw new Error('requestNonce must be 32 lowercase hex chars')
+  }
+  return normalized
 }
 
 function encodeU32LE(value: number): Uint8Array {
@@ -174,7 +248,7 @@ function bytesToHex(bytes: Uint8Array): string {
     .join('')
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
+export function bytesToBase64(bytes: Uint8Array): string {
   const maybeBuffer = (globalThis as { Buffer?: { from: (input: Uint8Array) => { toString: (encoding: string) => string } } }).Buffer
   if (maybeBuffer) {
     return maybeBuffer.from(bytes).toString('base64')
@@ -205,4 +279,12 @@ function base64ToBytes(value: string): Uint8Array {
 
   const decoded = atob(value)
   return Uint8Array.from(decoded, (char) => char.charCodeAt(0))
+}
+
+function deriveClientRevealKey(signature: Uint8Array): Uint8Array {
+  return sha256(signature)
+}
+
+function utf8Bytes(value: string): Uint8Array {
+  return new TextEncoder().encode(value)
 }

@@ -11,6 +11,7 @@ import com.moltrank.repository.CommitmentRepository;
 import com.moltrank.repository.CuratorRepository;
 import com.moltrank.repository.PairRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -30,7 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -51,10 +54,22 @@ class AutoRevealServiceTest {
     @Mock
     private PoolService poolService;
 
+    @Mock
+    private CommitRevealEnvelopeCryptoService commitRevealEnvelopeCryptoService;
+
+    @Mock
+    private CommitSecurityProperties commitSecurityProperties;
+
     @InjectMocks
     private AutoRevealService autoRevealService;
 
     private static final String WALLET = "4Nd1mYQzvgV8Vr3Z3nYb7pD6T8K9jF2eqWxY1S3Qh5Ro";
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(commitRevealEnvelopeCryptoService.isStorageEnvelope(anyString())).thenReturn(false);
+        lenient().when(commitSecurityProperties.isAllowLegacyRevealDecode()).thenReturn(true);
+    }
 
     private void configureRetries() {
         ReflectionTestUtils.setField(autoRevealService, "maxRetries", 1);
@@ -108,6 +123,53 @@ class AutoRevealServiceTest {
         assertNull(saved.getAutoRevealFailureReason());
         assertNull(saved.getAutoRevealFailedAt());
         assertNotNull(saved.getRevealedAt());
+    }
+
+    @Test
+    void autoRevealCommitments_revealsStorageEnvelopePayloadWhenHashMatches() {
+        configureRetries();
+
+        Round round = new Round();
+        round.setId(1);
+
+        Pair pair = new Pair();
+        pair.setId(1);
+
+        byte[] nonce = parseHex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        byte[] revealPayload = new byte[1 + nonce.length];
+        revealPayload[0] = 0;
+        System.arraycopy(nonce, 0, revealPayload, 1, nonce.length);
+        String storageEnvelope = "{\"version\":\"v2\",\"alg\":\"AES-256-GCM\",\"kid\":\"v1\",\"iv\":\"AA==\",\"ct\":\"AA==\"}";
+
+        Commitment commitment = new Commitment();
+        commitment.setId(11);
+        commitment.setPair(pair);
+        commitment.setCuratorWallet(WALLET);
+        commitment.setStake(75L);
+        commitment.setCommittedAt(OffsetDateTime.now().minusMinutes(1));
+        commitment.setEncryptedReveal(storageEnvelope);
+        commitment.setHash(CommitmentCodec.computeCommitmentHash(
+                WALLET,
+                pair.getId(),
+                PairWinner.A,
+                commitment.getStake(),
+                nonce
+        ));
+
+        when(commitRevealEnvelopeCryptoService.isStorageEnvelope(storageEnvelope)).thenReturn(true);
+        when(commitRevealEnvelopeCryptoService.decryptFromStorageEnvelope(storageEnvelope)).thenReturn(revealPayload);
+        when(pairRepository.findByRoundId(round.getId())).thenReturn(List.of(pair));
+        when(commitmentRepository.findByPairIdAndRevealed(pair.getId(), false)).thenReturn(List.of(commitment));
+        when(commitmentRepository.save(any(Commitment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        autoRevealService.autoRevealCommitments(round);
+
+        ArgumentCaptor<Commitment> captor = ArgumentCaptor.forClass(Commitment.class);
+        verify(commitmentRepository).save(captor.capture());
+        Commitment saved = captor.getValue();
+        assertTrue(saved.getRevealed());
+        assertEquals(PairWinner.A, saved.getChoice());
+        assertEquals("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", saved.getNonce());
     }
 
     @Test

@@ -1,12 +1,17 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useWallet } from '@solana/wallet-adapter-react'
 import { apiClient } from '@/lib/api-client'
 import { useIdentity } from '@/hooks/use-identity'
 import { Button } from '@/components/ui/button'
 import {
+  buildCommitAuthMessage,
+  bytesToBase64,
+  commitRequestNonceHex,
   computeCommitmentHashHex,
-  encodeRevealPayloadBase64,
+  encryptRevealPayloadWithSignature,
+  generateCommitRequestNonce,
   generateNonce,
 } from '@/lib/commitment'
 import type { Pair, ActiveRound } from '@/lib/types'
@@ -155,6 +160,7 @@ function PostPanel({
 
 export default function CuratePage() {
   const { walletAddress, connected } = useIdentity()
+  const { signMessage } = useWallet()
 
   const [pair, setPair] = useState<Pair | null>(null)
   const [round, setRound] = useState<ActiveRound | null>(null)
@@ -210,6 +216,10 @@ export default function CuratePage() {
     setError(null)
 
     try {
+      if (!signMessage) {
+        throw new Error('Connected wallet does not support message signing')
+      }
+
       const nonce = generateNonce()
       const commitmentHash = computeCommitmentHashHex({
         wallet: walletAddress,
@@ -218,13 +228,34 @@ export default function CuratePage() {
         stakeAmount: activeStake,
         nonce,
       })
-      const encryptedReveal = encodeRevealPayloadBase64(choice, nonce)
+      const requestNonce = generateCommitRequestNonce()
+      const requestNonceHex = commitRequestNonceHex(requestNonce)
+      const signedAt = Math.floor(Date.now() / 1000)
+      const authMessage = buildCommitAuthMessage({
+        wallet: walletAddress,
+        pairId: pair.id,
+        commitmentHash,
+        stakeAmount: activeStake,
+        signedAtEpochSeconds: signedAt,
+        requestNonceHex,
+      })
+      const signatureBytes = await signMessage(new TextEncoder().encode(authMessage))
+      const { encryptedRevealBase64, revealIvBase64 } = await encryptRevealPayloadWithSignature({
+        choice,
+        nonce,
+        signature: signatureBytes,
+        authMessage,
+      })
 
       // Submit commitment to backend (which coordinates with on-chain)
       await apiClient.commitVote(pair.id, {
         wallet: walletAddress,
         commitmentHash,
-        encryptedReveal,
+        encryptedReveal: encryptedRevealBase64,
+        revealIv: revealIvBase64,
+        signature: bytesToBase64(signatureBytes),
+        signedAt,
+        requestNonce: requestNonceHex,
         stakeAmount: activeStake,
       })
 

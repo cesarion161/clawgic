@@ -67,6 +67,8 @@ public class AutoRevealService {
     private final PairRepository pairRepository;
     private final CuratorRepository curatorRepository;
     private final PoolService poolService;
+    private final CommitRevealEnvelopeCryptoService commitRevealEnvelopeCryptoService;
+    private final CommitSecurityProperties commitSecurityProperties;
 
     /**
      * Auto-reveals all unrevealed commitments for a round.
@@ -175,9 +177,20 @@ public class AutoRevealService {
     }
 
     /**
-     * Decode canonical payload first, then fallback to legacy AES payload format.
+     * Decode v2 storage envelope first.
+     * Optionally fallback to legacy payload formats behind feature flag.
      */
     private RevealPayload decodeRevealPayload(String encodedPayload) throws Exception {
+        if (commitRevealEnvelopeCryptoService.isStorageEnvelope(encodedPayload)) {
+            byte[] canonicalBytes = commitRevealEnvelopeCryptoService.decryptFromStorageEnvelope(encodedPayload);
+            CommitmentCodec.RevealPayload canonical = CommitmentCodec.decodeRevealPayload(canonicalBytes);
+            return new RevealPayload(canonical.choice(), canonical.nonceHex(), canonical.nonce(), canonicalBytes);
+        }
+
+        if (!commitSecurityProperties.isAllowLegacyRevealDecode()) {
+            throw new IllegalArgumentException("Legacy reveal payload decoding is disabled");
+        }
+
         try {
             CommitmentCodec.RevealPayload canonical = CommitmentCodec.decodeRevealPayloadBase64(encodedPayload);
             byte[] rawPayload = Base64.getDecoder().decode(encodedPayload);

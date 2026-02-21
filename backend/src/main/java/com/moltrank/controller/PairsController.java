@@ -8,7 +8,7 @@ import com.moltrank.model.Pair;
 import com.moltrank.repository.CommitmentRepository;
 import com.moltrank.repository.IdentityRepository;
 import com.moltrank.repository.PairRepository;
-import com.moltrank.service.CommitmentCodec;
+import com.moltrank.service.CommitSecurityService;
 import com.moltrank.service.PairSelectionService;
 import com.moltrank.service.PairSkipService;
 import org.springframework.http.HttpStatus;
@@ -29,17 +29,20 @@ public class PairsController {
     private final IdentityRepository identityRepository;
     private final PairSkipService pairSkipService;
     private final PairSelectionService pairSelectionService;
+    private final CommitSecurityService commitSecurityService;
 
     public PairsController(PairRepository pairRepository,
                            CommitmentRepository commitmentRepository,
                            IdentityRepository identityRepository,
                            PairSkipService pairSkipService,
-                           PairSelectionService pairSelectionService) {
+                           PairSelectionService pairSelectionService,
+                           CommitSecurityService commitSecurityService) {
         this.pairRepository = pairRepository;
         this.commitmentRepository = commitmentRepository;
         this.identityRepository = identityRepository;
         this.pairSkipService = pairSkipService;
         this.pairSelectionService = pairSelectionService;
+        this.commitSecurityService = commitSecurityService;
     }
 
     /**
@@ -93,28 +96,32 @@ public class PairsController {
             return ResponseEntity.badRequest().build();
         }
 
-        String normalizedHash;
         try {
-            normalizedHash = CommitmentCodec.normalizeCommitmentHash(request.commitmentHash());
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.badRequest().build();
+            CommitSecurityService.SecuredCommitmentPayload securedPayload =
+                    commitSecurityService.secureCommitPayload(id, request);
+
+            Commitment commitment = new Commitment();
+            commitment.setCuratorWallet(request.wallet());
+            commitment.setHash(securedPayload.normalizedHash());
+            commitment.setStake(request.stakeAmount());
+            commitment.setEncryptedReveal(securedPayload.encryptedRevealForStorage());
+
+            // Set pair reference and timestamp
+            commitment.setPair(pair);
+            OffsetDateTime committedAt = OffsetDateTime.now();
+            commitment.setCommittedAt(committedAt);
+            commitment.setRevealed(false);
+
+            // Save commitment
+            commitmentRepository.save(commitment);
+            return ResponseEntity.status(HttpStatus.CREATED).build();
+        } catch (CommitSecurityService.CommitSecurityException ex) {
+            return switch (ex.getError()) {
+                case BAD_REQUEST -> ResponseEntity.badRequest().build();
+                case UNAUTHORIZED -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+                case REPLAY -> ResponseEntity.status(HttpStatus.CONFLICT).build();
+            };
         }
-
-        Commitment commitment = new Commitment();
-        commitment.setCuratorWallet(request.wallet());
-        commitment.setHash(normalizedHash);
-        commitment.setStake(request.stakeAmount());
-        commitment.setEncryptedReveal(request.encryptedReveal());
-
-        // Set pair reference and timestamp
-        commitment.setPair(pair);
-        OffsetDateTime committedAt = OffsetDateTime.now();
-        commitment.setCommittedAt(committedAt);
-        commitment.setRevealed(false);
-
-        // Save commitment
-        commitmentRepository.save(commitment);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     /**
