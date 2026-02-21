@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.data.domain.Pageable;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -16,6 +17,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,13 +36,40 @@ class PairSelectionServiceTest {
     @Test
     void findNextPairForCurator_queriesCommitPhaseOnly() {
         Pair pair = new Pair();
-        when(pairRepository.findNextPairForCurator(WALLET, 1, List.of(RoundStatus.COMMIT)))
-                .thenReturn(Optional.of(pair));
+        when(pairRepository.findNextPairsForCurator(
+                eq(WALLET),
+                eq(1),
+                eq(List.of(RoundStatus.COMMIT)),
+                any(Pageable.class)))
+                .thenReturn(List.of(pair));
 
         Optional<Pair> result = pairSelectionService.findNextPairForCurator(WALLET, 1);
 
         assertSame(pair, result.orElseThrow());
-        verify(pairRepository).findNextPairForCurator(WALLET, 1, List.of(RoundStatus.COMMIT));
+        verify(pairRepository).findNextPairsForCurator(
+                eq(WALLET),
+                eq(1),
+                eq(List.of(RoundStatus.COMMIT)),
+                any(Pageable.class));
+    }
+
+    @Test
+    void findNextPairForCurator_returnsFirstWhenMultipleCandidatesExist() {
+        Pair first = new Pair();
+        first.setId(1);
+        Pair second = new Pair();
+        second.setId(2);
+
+        when(pairRepository.findNextPairsForCurator(
+                eq(WALLET),
+                eq(1),
+                eq(List.of(RoundStatus.COMMIT)),
+                any(Pageable.class)))
+                .thenReturn(List.of(first, second));
+
+        Optional<Pair> result = pairSelectionService.findNextPairForCurator(WALLET, 1);
+
+        assertEquals(1, result.orElseThrow().getId());
     }
 
     @ParameterizedTest

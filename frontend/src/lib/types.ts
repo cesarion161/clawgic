@@ -152,4 +152,9 @@ export interface ActiveRound {
   revealDeadline: string | null
   totalPairs: number
   remainingPairs: number
+  targetRevealsPerPair?: number
+  expectedRevealsPerCurator?: number
+  requiredCurators?: number
+  activeCurators?: number
+  supplyRatio?: number
 }

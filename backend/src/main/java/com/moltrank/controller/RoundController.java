@@ -6,6 +6,7 @@ import com.moltrank.model.Round;
 import com.moltrank.model.RoundStatus;
 import com.moltrank.repository.CommitmentRepository;
 import com.moltrank.repository.RoundRepository;
+import com.moltrank.service.CuratorSupplyService;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,11 +29,14 @@ public class RoundController {
 
     private final RoundRepository roundRepository;
     private final CommitmentRepository commitmentRepository;
+    private final CuratorSupplyService curatorSupplyService;
 
     public RoundController(RoundRepository roundRepository,
-                           CommitmentRepository commitmentRepository) {
+                           CommitmentRepository commitmentRepository,
+                           CuratorSupplyService curatorSupplyService) {
         this.roundRepository = roundRepository;
         this.commitmentRepository = commitmentRepository;
+        this.curatorSupplyService = curatorSupplyService;
     }
 
     /**
@@ -96,7 +100,8 @@ public class RoundController {
         int totalPairs = round.getPairs() != null ? round.getPairs() : 0;
         long committedPairs = commitmentRepository.countDistinctCommittedPairsByRoundId(round.getId());
         int remainingPairs = (int) Math.max(0, totalPairs - committedPairs);
+        CuratorSupplyService.CuratorSupplySnapshot supplySnapshot = curatorSupplyService.computeForRound(round);
 
-        return ResponseEntity.ok(ActiveRoundResponse.from(round, totalPairs, remainingPairs));
+        return ResponseEntity.ok(ActiveRoundResponse.from(round, totalPairs, remainingPairs, supplySnapshot));
     }
 }

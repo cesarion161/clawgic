@@ -9,6 +9,7 @@ import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 import org.bouncycastle.crypto.signers.Ed25519Signer;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
@@ -33,6 +34,7 @@ public class CommitSecurityService {
     private final CommitRevealEnvelopeCryptoService commitRevealEnvelopeCryptoService;
     private final CommitSecurityProperties commitSecurityProperties;
 
+    @Transactional
     public SecuredCommitmentPayload secureCommitPayload(Integer pairId, CommitPairRequest request) {
         final String normalizedHash;
         try {

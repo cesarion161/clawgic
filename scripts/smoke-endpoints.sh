@@ -256,6 +256,7 @@ BEGIN;
 
 DELETE FROM commitment WHERE pair_id = ${SEED_PAIR_ID};
 DELETE FROM pair_skip WHERE pair_id = ${SEED_PAIR_ID};
+DELETE FROM commit_request_replay_guard;
 DELETE FROM subscription WHERE market_id = ${SEED_MARKET_ID};
 DELETE FROM subscription WHERE reader_wallet = '${BOOTSTRAP_MARKET_READER_WALLET}';
 DELETE FROM golden_set_item WHERE source IN ('smoke-seed', 'smoke-api');

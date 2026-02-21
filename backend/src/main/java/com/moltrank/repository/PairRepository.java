@@ -2,13 +2,13 @@ package com.moltrank.repository;
 
 import com.moltrank.model.Pair;
 import com.moltrank.model.RoundStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface PairRepository extends JpaRepository<Pair, Integer> {
@@ -30,7 +30,8 @@ public interface PairRepository extends JpaRepository<Pair, Integer> {
             "  AND s.curatorWallet = :wallet" +
             ") " +
             "ORDER BY p.id ASC")
-    Optional<Pair> findNextPairForCurator(@Param("wallet") String wallet,
-                                          @Param("marketId") Integer marketId,
-                                          @Param("statuses") List<RoundStatus> statuses);
+    List<Pair> findNextPairsForCurator(@Param("wallet") String wallet,
+                                       @Param("marketId") Integer marketId,
+                                       @Param("statuses") List<RoundStatus> statuses,
+                                       Pageable pageable);
 }

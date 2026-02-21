@@ -4,10 +4,13 @@ import com.moltrank.model.Market;
 import com.moltrank.model.Round;
 import com.moltrank.model.RoundStatus;
 import com.moltrank.repository.CommitmentRepository;
+import com.moltrank.repository.CuratorRepository;
 import com.moltrank.repository.RoundRepository;
+import com.moltrank.service.CuratorSupplyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.web.servlet.MockMvc;
@@ -28,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Verifies the rounds page can retrieve data without crashes.
  */
 @WebMvcTest(RoundController.class)
+@Import(CuratorSupplyService.class)
 class RoundControllerTest {
 
     @Autowired
@@ -38,6 +42,9 @@ class RoundControllerTest {
 
     @MockitoBean
     private CommitmentRepository commitmentRepository;
+
+    @MockitoBean
+    private CuratorRepository curatorRepository;
 
     private static final class ByteBuddyInterceptorStub {
     }
@@ -117,6 +124,8 @@ class RoundControllerTest {
                 .thenReturn(Optional.of(round));
         when(commitmentRepository.countDistinctCommittedPairsByRoundId(7))
                 .thenReturn(3L);
+        when(curatorRepository.countByMarketId(1))
+                .thenReturn(4L);
 
         mockMvc.perform(get("/api/rounds/active"))
                 .andExpect(status().isOk())
@@ -124,7 +133,55 @@ class RoundControllerTest {
                 .andExpect(jsonPath("$.roundId").value(7))
                 .andExpect(jsonPath("$.status").value("COMMIT"))
                 .andExpect(jsonPath("$.totalPairs").value(10))
-                .andExpect(jsonPath("$.remainingPairs").value(7));
+                .andExpect(jsonPath("$.remainingPairs").value(7))
+                .andExpect(jsonPath("$.targetRevealsPerPair").value(3))
+                .andExpect(jsonPath("$.expectedRevealsPerCurator").value(6))
+                .andExpect(jsonPath("$.requiredCurators").value(5))
+                .andExpect(jsonPath("$.activeCurators").value(4))
+                .andExpect(jsonPath("$.supplyRatio").value(0.8));
+    }
+
+    @Test
+    void getActiveRound_returnsCuratorSupplyForSeededScenario() throws Exception {
+        Market market = buildMarket();
+        market.setId(2);
+        Round round = buildRound(8, RoundStatus.OPEN, market);
+        round.setPairs(11);
+
+        when(roundRepository.findTopByMarketIdAndStatusInOrderByIdDesc(eq(2), anyList()))
+                .thenReturn(Optional.of(round));
+        when(commitmentRepository.countDistinctCommittedPairsByRoundId(8))
+                .thenReturn(5L);
+        when(curatorRepository.countByMarketId(2))
+                .thenReturn(2L);
+
+        mockMvc.perform(get("/api/rounds/active").param("marketId", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(8))
+                .andExpect(jsonPath("$.remainingPairs").value(6))
+                .andExpect(jsonPath("$.requiredCurators").value(6))
+                .andExpect(jsonPath("$.activeCurators").value(2))
+                .andExpect(jsonPath("$.supplyRatio").value(0.3333));
+    }
+
+    @Test
+    void getActiveRound_returnsBalancedRatioWhenNoPairsGenerated() throws Exception {
+        Market market = buildMarket();
+        Round round = buildRound(9, RoundStatus.OPEN, market);
+        round.setPairs(0);
+
+        when(roundRepository.findTopByMarketIdAndStatusInOrderByIdDesc(eq(1), anyList()))
+                .thenReturn(Optional.of(round));
+        when(commitmentRepository.countDistinctCommittedPairsByRoundId(9))
+                .thenReturn(0L);
+        when(curatorRepository.countByMarketId(1))
+                .thenReturn(0L);
+
+        mockMvc.perform(get("/api/rounds/active"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requiredCurators").value(0))
+                .andExpect(jsonPath("$.activeCurators").value(0))
+                .andExpect(jsonPath("$.supplyRatio").value(1.0));
     }
 
     @Test

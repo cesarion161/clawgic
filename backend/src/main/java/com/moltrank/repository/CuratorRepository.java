@@ -14,4 +14,5 @@ public interface CuratorRepository extends JpaRepository<Curator, CuratorId> {
     List<Curator> findByMarketId(Integer marketId);
     List<Curator> findByMarketIdOrderByCuratorScoreDesc(Integer marketId);
     List<Curator> findByMarketId(Integer marketId, Pageable pageable);
+    long countByMarketId(Integer marketId);
 }

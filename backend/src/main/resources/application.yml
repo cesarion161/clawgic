@@ -46,6 +46,9 @@ solana:
 
 moltrank:
   pairs-per-subscriber: 5  # K value for demand-gated pair generation formula
+  curation:
+    target-reveals-per-pair: 3
+    expected-reveals-per-curator: 6
   ingestion:
     enabled: true
     run-on-startup: true

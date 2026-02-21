@@ -57,6 +57,10 @@ public class PairsController {
             @RequestParam String wallet,
             @RequestParam(defaultValue = "1") Integer marketId) {
 
+        if (identityRepository.findByWallet(wallet).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
         // Find first uncommitted pair for this curator
         Pair nextPair = pairSelectionService.findNextPairForCurator(wallet, marketId)
                 .orElse(null);

@@ -133,6 +133,7 @@ class PairsControllerTest {
     void getNextPair_returnsPairForCurator() throws Exception {
         Pair pair = buildPair(false);
         pair.getRound().setStatus(RoundStatus.COMMIT);
+        when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
         when(pairSelectionService.findNextPairForCurator(WALLET, 1))
                 .thenReturn(Optional.of(pair));
 
@@ -151,8 +152,18 @@ class PairsControllerTest {
 
     @Test
     void getNextPair_returns404WhenNoPairsAvailable() throws Exception {
+        when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
         when(pairSelectionService.findNextPairForCurator(WALLET, 1))
                 .thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/pairs/next")
+                        .param("wallet", WALLET))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getNextPair_returns404WhenWalletIdentityDoesNotExist() throws Exception {
+        when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/pairs/next")
                         .param("wallet", WALLET))
@@ -340,6 +351,7 @@ class PairsControllerTest {
     void getNextPair_handlesProxyLikeEntityGraphWithoutSerialization500() throws Exception {
         Pair pair = buildPair(true);
         pair.getRound().setStatus(RoundStatus.COMMIT);
+        when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
         when(pairSelectionService.findNextPairForCurator(WALLET, 1))
                 .thenReturn(Optional.of(pair));
 
@@ -356,6 +368,7 @@ class PairsControllerTest {
         Pair pair = buildPair(false);
         pair.getRound().setStatus(RoundStatus.COMMIT);
 
+        when(identityRepository.findByWallet(WALLET)).thenReturn(Optional.of(buildIdentity(WALLET)));
         when(pairSelectionService.findNextPairForCurator(WALLET, 1))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(pair))
