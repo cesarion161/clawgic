@@ -14,6 +14,7 @@ public interface CommitmentRepository extends JpaRepository<Commitment, Integer>
     List<Commitment> findByCuratorWallet(String curatorWallet);
     List<Commitment> findByRevealed(Boolean revealed);
     List<Commitment> findByPairIdAndRevealed(Integer pairId, Boolean revealed);
+    List<Commitment> findByRevealedAndNonRevealPenalized(Boolean revealed, Boolean nonRevealPenalized);
 
     @Query("SELECT COUNT(DISTINCT c.pair.id) FROM Commitment c WHERE c.pair.round.id = :roundId")
     long countDistinctCommittedPairsByRoundId(@Param("roundId") Integer roundId);

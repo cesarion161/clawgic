@@ -1,14 +1,19 @@
 package com.moltrank.service;
 
 import com.moltrank.model.Commitment;
+import com.moltrank.model.Curator;
+import com.moltrank.model.CuratorId;
 import com.moltrank.model.Pair;
 import com.moltrank.model.PairWinner;
 import com.moltrank.model.Round;
 import com.moltrank.repository.CommitmentRepository;
+import com.moltrank.repository.CuratorRepository;
 import com.moltrank.repository.PairRepository;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,12 +37,14 @@ import java.util.List;
  * - Non-reveal penalties (stake forfeiture)
  */
 @Service
+@RequiredArgsConstructor
 public class AutoRevealService {
 
     private static final Logger log = LoggerFactory.getLogger(AutoRevealService.class);
     private static final String FAILURE_HASH_MISMATCH = "HASH_MISMATCH";
     private static final String FAILURE_SOLANA_SUBMISSION = "SOLANA_SUBMISSION_FAILED";
     private static final String FAILURE_INVALID_REVEAL_PAYLOAD = "INVALID_REVEAL_PAYLOAD";
+    private static final String FAILURE_NON_REVEAL_FORFEITED = "NON_REVEAL_FORFEITED";
     private static final String FAILURE_UNEXPECTED_ERROR = "UNEXPECTED_ERROR";
 
     @Value("${moltrank.reveal.grace-period-minutes:30}")
@@ -49,19 +56,17 @@ public class AutoRevealService {
     @Value("${moltrank.reveal.retry-delay-seconds:5}")
     private int retryDelaySeconds;
 
+    @Value("${moltrank.reveal.penalty-enforcement-enabled:true}")
+    private boolean penaltyEnforcementEnabled;
+
     // For MVP: hardcoded session key (in production: use secure key management)
     @Value("${moltrank.session.encryption-key:moltrank-demo-session-key-32b}")
     private String sessionEncryptionKey;
 
     private final CommitmentRepository commitmentRepository;
     private final PairRepository pairRepository;
-
-    public AutoRevealService(
-            CommitmentRepository commitmentRepository,
-            PairRepository pairRepository) {
-        this.commitmentRepository = commitmentRepository;
-        this.pairRepository = pairRepository;
-    }
+    private final CuratorRepository curatorRepository;
+    private final PoolService poolService;
 
     /**
      * Auto-reveals all unrevealed commitments for a round.
@@ -331,9 +336,24 @@ public class AutoRevealService {
         // TODO: Implement actual push notification
         // For MVP: just log the notification
 
-        OffsetDateTime gracePeriodEnd = commitment.getCommittedAt().plusMinutes(gracePeriodMinutes);
+        OffsetDateTime gracePeriodEnd = resolveGraceDeadline(commitment);
         log.info("Curator {} has until {} to manually reveal commitment {}",
                 commitment.getCuratorWallet(), gracePeriodEnd, commitment.getId());
+    }
+
+    /**
+     * Periodic scheduler entrypoint for non-reveal penalty enforcement.
+     */
+    @Scheduled(
+            fixedDelayString = "${moltrank.reveal.penalty-interval-ms:60000}",
+            initialDelayString = "${moltrank.reveal.penalty-initial-delay-ms:60000}")
+    @Transactional
+    public void scheduledNonRevealPenaltyEnforcement() {
+        if (!penaltyEnforcementEnabled) {
+            log.debug("Non-reveal penalty enforcement skipped: disabled by config");
+            return;
+        }
+        enforceNonRevealPenalties();
     }
 
     /**
@@ -342,24 +362,96 @@ public class AutoRevealService {
      */
     @Transactional
     public void enforceNonRevealPenalties() {
-        OffsetDateTime gracePeriodCutoff = OffsetDateTime.now().minusMinutes(gracePeriodMinutes);
+        OffsetDateTime now = OffsetDateTime.now();
+        List<Commitment> unrevealedCommitments =
+                commitmentRepository.findByRevealedAndNonRevealPenalized(false, false);
 
-        List<Commitment> unrevealedCommitments = commitmentRepository.findByRevealed(false);
+        int penalizedCount = 0;
+        long totalForfeitedStake = 0L;
 
         for (Commitment commitment : unrevealedCommitments) {
-            if (commitment.getCommittedAt().isBefore(gracePeriodCutoff)) {
-                log.warn("Commitment {} exceeded grace period, forfeiting stake of {}",
+            if (!hasGraceWindowExpired(commitment, now)) {
+                continue;
+            }
+
+            long stake = commitment.getStake() != null ? commitment.getStake() : 0L;
+            if (stake <= 0) {
+                log.warn("Commitment {} has non-positive stake {}, skipping forfeiture",
                         commitment.getId(), commitment.getStake());
+                continue;
+            }
 
-                // TODO: Implement stake forfeiture logic
-                // For MVP: just log the penalty
+            log.warn("Commitment {} exceeded grace period, forfeiting stake of {}",
+                    commitment.getId(), stake);
 
-                // Mark as revealed to prevent repeated penalties
-                commitment.setRevealed(true);
-                commitment.setRevealedAt(OffsetDateTime.now());
-                commitmentRepository.save(commitment);
+            applyCuratorForfeiture(commitment, stake, now);
+            poolService.addToPool(stake, "non-reveal penalty commitment " + commitment.getId());
+
+            commitment.setNonRevealPenalized(true);
+            commitment.setNonRevealPenalizedAt(now);
+            commitment.setAutoRevealFailed(true);
+            commitment.setAutoRevealFailureReason(FAILURE_NON_REVEAL_FORFEITED);
+            commitment.setAutoRevealFailedAt(now);
+            commitmentRepository.save(commitment);
+
+            penalizedCount++;
+            totalForfeitedStake += stake;
+        }
+
+        if (penalizedCount > 0) {
+            log.info("Applied {} non-reveal penalties, total forfeited stake {}",
+                    penalizedCount, totalForfeitedStake);
+        }
+    }
+
+    private void applyCuratorForfeiture(Commitment commitment, long amount, OffsetDateTime now) {
+        Integer marketId = null;
+        if (commitment.getPair() != null
+                && commitment.getPair().getRound() != null
+                && commitment.getPair().getRound().getMarket() != null) {
+            marketId = commitment.getPair().getRound().getMarket().getId();
+        }
+
+        if (marketId == null) {
+            log.warn("Skipping curator loss update for commitment {}: missing market context",
+                    commitment.getId());
+            return;
+        }
+
+        Curator curator = curatorRepository.findById(new CuratorId(commitment.getCuratorWallet(), marketId))
+                .orElse(null);
+        if (curator == null) {
+            log.warn("Skipping curator loss update for commitment {}: curator {} missing in market {}",
+                    commitment.getId(), commitment.getCuratorWallet(), marketId);
+            return;
+        }
+
+        curator.setLost(curator.getLost() + amount);
+        curator.setUpdatedAt(now);
+        curatorRepository.save(curator);
+    }
+
+    private boolean hasGraceWindowExpired(Commitment commitment, OffsetDateTime now) {
+        return !resolveGraceDeadline(commitment).isAfter(now);
+    }
+
+    private OffsetDateTime resolveGraceDeadline(Commitment commitment) {
+        OffsetDateTime deadlineBase = commitment.getCommittedAt();
+
+        if (commitment.getPair() != null
+                && commitment.getPair().getRound() != null
+                && commitment.getPair().getRound().getCommitDeadline() != null) {
+            OffsetDateTime roundCommitDeadline = commitment.getPair().getRound().getCommitDeadline();
+            if (deadlineBase == null || roundCommitDeadline.isAfter(deadlineBase)) {
+                deadlineBase = roundCommitDeadline;
             }
         }
+
+        if (deadlineBase == null) {
+            deadlineBase = OffsetDateTime.now();
+        }
+
+        return deadlineBase.plusMinutes(gracePeriodMinutes);
     }
 
     /**

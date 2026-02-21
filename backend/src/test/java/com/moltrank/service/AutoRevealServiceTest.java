@@ -1,10 +1,14 @@
 package com.moltrank.service;
 
 import com.moltrank.model.Commitment;
+import com.moltrank.model.Curator;
+import com.moltrank.model.CuratorId;
+import com.moltrank.model.Market;
 import com.moltrank.model.Pair;
 import com.moltrank.model.PairWinner;
 import com.moltrank.model.Round;
 import com.moltrank.repository.CommitmentRepository;
+import com.moltrank.repository.CuratorRepository;
 import com.moltrank.repository.PairRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,6 +21,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.OffsetDateTime;
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -24,7 +29,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +44,12 @@ class AutoRevealServiceTest {
 
     @Mock
     private PairRepository pairRepository;
+
+    @Mock
+    private CuratorRepository curatorRepository;
+
+    @Mock
+    private PoolService poolService;
 
     @InjectMocks
     private AutoRevealService autoRevealService;
@@ -134,6 +149,100 @@ class AutoRevealServiceTest {
         assertNotNull(saved.getAutoRevealFailedAt());
         assertNull(saved.getChoice());
         assertNull(saved.getNonce());
+    }
+
+    @Test
+    void enforceNonRevealPenalties_forfeitsExpiredCommitmentAndUpdatesAccounting() {
+        ReflectionTestUtils.setField(autoRevealService, "gracePeriodMinutes", 30);
+
+        Market market = new Market();
+        market.setId(1);
+
+        Round round = new Round();
+        round.setId(10);
+        round.setMarket(market);
+        round.setCommitDeadline(OffsetDateTime.now().minusMinutes(31));
+
+        Pair pair = new Pair();
+        pair.setId(33);
+        pair.setRound(round);
+
+        Commitment commitment = new Commitment();
+        commitment.setId(12);
+        commitment.setPair(pair);
+        commitment.setCuratorWallet(WALLET);
+        commitment.setStake(1_000_000_000L);
+        commitment.setCommittedAt(OffsetDateTime.now().minusMinutes(90));
+        commitment.setRevealed(false);
+        commitment.setNonRevealPenalized(false);
+
+        Curator curator = new Curator();
+        curator.setWallet(WALLET);
+        curator.setMarketId(1);
+        curator.setIdentityId(42);
+        curator.setLost(100L);
+
+        when(commitmentRepository.findByRevealedAndNonRevealPenalized(false, false)).thenReturn(List.of(commitment));
+        when(curatorRepository.findById(new CuratorId(WALLET, 1))).thenReturn(Optional.of(curator));
+        when(curatorRepository.save(any(Curator.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(commitmentRepository.save(any(Commitment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        autoRevealService.enforceNonRevealPenalties();
+
+        verify(poolService).addToPool(1_000_000_000L, "non-reveal penalty commitment 12");
+        assertEquals(1_000_000_100L, curator.getLost());
+
+        ArgumentCaptor<Commitment> captor = ArgumentCaptor.forClass(Commitment.class);
+        verify(commitmentRepository).save(captor.capture());
+        Commitment saved = captor.getValue();
+        assertTrue(saved.getNonRevealPenalized());
+        assertNotNull(saved.getNonRevealPenalizedAt());
+        assertTrue(saved.getAutoRevealFailed());
+        assertEquals("NON_REVEAL_FORFEITED", saved.getAutoRevealFailureReason());
+        assertNotNull(saved.getAutoRevealFailedAt());
+    }
+
+    @Test
+    void enforceNonRevealPenalties_skipsCommitmentWithinGraceWindow() {
+        ReflectionTestUtils.setField(autoRevealService, "gracePeriodMinutes", 30);
+
+        Market market = new Market();
+        market.setId(1);
+
+        Round round = new Round();
+        round.setId(11);
+        round.setMarket(market);
+        round.setCommitDeadline(OffsetDateTime.now().minusMinutes(10));
+
+        Pair pair = new Pair();
+        pair.setId(34);
+        pair.setRound(round);
+
+        Commitment commitment = new Commitment();
+        commitment.setId(13);
+        commitment.setPair(pair);
+        commitment.setCuratorWallet(WALLET);
+        commitment.setStake(1_000_000_000L);
+        commitment.setCommittedAt(OffsetDateTime.now().minusMinutes(20));
+        commitment.setRevealed(false);
+        commitment.setNonRevealPenalized(false);
+
+        when(commitmentRepository.findByRevealedAndNonRevealPenalized(false, false)).thenReturn(List.of(commitment));
+
+        autoRevealService.enforceNonRevealPenalties();
+
+        verify(poolService, never()).addToPool(anyLong(), any(String.class));
+        verify(commitmentRepository, never()).save(any(Commitment.class));
+        verifyNoInteractions(curatorRepository);
+    }
+
+    @Test
+    void scheduledNonRevealPenaltyEnforcement_skipsWhenDisabled() {
+        ReflectionTestUtils.setField(autoRevealService, "penaltyEnforcementEnabled", false);
+
+        autoRevealService.scheduledNonRevealPenaltyEnforcement();
+
+        verify(commitmentRepository, never()).findByRevealedAndNonRevealPenalized(eq(false), eq(false));
     }
 
     private static byte[] parseHex(String value) {

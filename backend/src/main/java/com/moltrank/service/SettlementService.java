@@ -5,6 +5,7 @@ import com.moltrank.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +48,9 @@ public class SettlementService {
     private final RoundRepository roundRepository;
     private final PoolService poolService;
     private final EloService eloService;
+
+    @Value("${moltrank.reveal.grace-period-minutes:30}")
+    private int gracePeriodMinutes;
 
     /**
      * Settle a round. Idempotent - can be called multiple times safely.
@@ -138,6 +142,7 @@ public class SettlementService {
     private PairSettlement settlePair(Pair pair, long basePerPair, long premiumPerPair) {
         PairSettlement settlement = new PairSettlement();
         settlement.pairId = pair.getId();
+        OffsetDateTime settlementTime = OffsetDateTime.now();
 
         List<Commitment> commitments = commitmentRepository.findByPairId(pair.getId());
 
@@ -145,7 +150,7 @@ public class SettlementService {
         Map<PairWinner, Long> voteStakes = new HashMap<>();
         Map<PairWinner, List<Commitment>> voteGroups = new HashMap<>();
         long totalStake = 0L;
-        List<String> nonRevealWallets = new ArrayList<>();
+        List<Commitment> nonRevealCommitments = new ArrayList<>();
         BigDecimal totalCuratorScore = BigDecimal.ZERO;
         int revealedCount = 0;
 
@@ -153,7 +158,7 @@ public class SettlementService {
             totalStake += commitment.getStake();
 
             if (!commitment.getRevealed()) {
-                nonRevealWallets.add(commitment.getCuratorWallet());
+                nonRevealCommitments.add(commitment);
                 continue;
             }
 
@@ -252,7 +257,7 @@ public class SettlementService {
                 totalRewards += totalPayout;
 
                 curator.setEarned(curator.getEarned() + reward);
-                curator.setUpdatedAt(OffsetDateTime.now());
+                curator.setUpdatedAt(settlementTime);
                 curatorRepository.save(curator);
             }
         }
@@ -271,26 +276,32 @@ public class SettlementService {
 
                 Curator curator = getCurator(commitment.getCuratorWallet(), pair.getRound().getMarket().getId());
                 curator.setLost(curator.getLost() + penalty);
-                curator.setUpdatedAt(OffsetDateTime.now());
+                curator.setUpdatedAt(settlementTime);
                 curatorRepository.save(curator);
             }
         }
 
         // Settle non-reveals (100% slashed)
-        for (String wallet : nonRevealWallets) {
-            Commitment commitment = commitments.stream()
-                    .filter(c -> c.getCuratorWallet().equals(wallet))
-                    .findFirst()
-                    .orElse(null);
+        for (Commitment commitment : nonRevealCommitments) {
+            if (Boolean.TRUE.equals(commitment.getNonRevealPenalized())) {
+                continue;
+            }
+            if (!hasGraceWindowExpired(commitment, settlementTime)) {
+                continue;
+            }
 
-            if (commitment != null) {
-                totalSlashed += commitment.getStake();
+            totalSlashed += commitment.getStake();
 
-                Curator curator = getCurator(wallet, pair.getRound().getMarket().getId());
+            Curator curator = getCurator(commitment.getCuratorWallet(), pair.getRound().getMarket().getId());
+            if (curator != null) {
                 curator.setLost(curator.getLost() + commitment.getStake());
-                curator.setUpdatedAt(OffsetDateTime.now());
+                curator.setUpdatedAt(settlementTime);
                 curatorRepository.save(curator);
             }
+
+            commitment.setNonRevealPenalized(true);
+            commitment.setNonRevealPenalizedAt(settlementTime);
+            commitmentRepository.save(commitment);
         }
 
         settlement.totalSlashed = totalSlashed;
@@ -318,6 +329,29 @@ public class SettlementService {
 
     private Curator getCurator(String wallet, Integer marketId) {
         return curatorRepository.findById(new CuratorId(wallet, marketId)).orElse(null);
+    }
+
+    private boolean hasGraceWindowExpired(Commitment commitment, OffsetDateTime now) {
+        return !resolveGraceDeadline(commitment).isAfter(now);
+    }
+
+    private OffsetDateTime resolveGraceDeadline(Commitment commitment) {
+        OffsetDateTime deadlineBase = commitment.getCommittedAt();
+
+        if (commitment.getPair() != null
+                && commitment.getPair().getRound() != null
+                && commitment.getPair().getRound().getCommitDeadline() != null) {
+            OffsetDateTime roundCommitDeadline = commitment.getPair().getRound().getCommitDeadline();
+            if (deadlineBase == null || roundCommitDeadline.isAfter(deadlineBase)) {
+                deadlineBase = roundCommitDeadline;
+            }
+        }
+
+        if (deadlineBase == null) {
+            deadlineBase = OffsetDateTime.now();
+        }
+
+        return deadlineBase.plusMinutes(gracePeriodMinutes);
     }
 
     private String generateHash(String input) {

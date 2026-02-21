@@ -203,6 +203,7 @@ class EndToEndFlowTest {
         round.setMarket(market);
         round.setStatus(RoundStatus.SETTLING);
         round.setPairs(1);
+        round.setCommitDeadline(OffsetDateTime.now().minusMinutes(40));
 
         Pair pair = new Pair();
         pair.setId(100);
@@ -217,6 +218,7 @@ class EndToEndFlowTest {
 
         Commitment revealed = createCommitment(pair, "wallet-revealed", PairWinner.A, 1_000_000_000L, true);
         Commitment nonRevealed = createCommitment(pair, "wallet-nonreveal", null, 2_000_000_000L, false);
+        nonRevealed.setCommittedAt(OffsetDateTime.now().minusMinutes(50));
 
         when(roundRepository.findById(2)).thenReturn(Optional.of(round));
         when(roundRepository.findByStatus(RoundStatus.SETTLING)).thenReturn(List.of(round));
@@ -244,6 +246,61 @@ class EndToEndFlowTest {
         // Non-reveal curator loses 100% of stake
         assertEquals(2_000_000_000L, nonRevealCurator.getLost(),
                 "Non-reveal should lose 100% stake (2 SOL)");
+        assertTrue(nonRevealed.getNonRevealPenalized(), "Non-reveal penalty should be marked on commitment");
+    }
+
+    @Test
+    void fullFlow_nonRevealAlreadyPenalized_notDoubleCharged() {
+        Round round = new Round();
+        round.setId(5);
+        round.setMarket(market);
+        round.setStatus(RoundStatus.SETTLING);
+        round.setPairs(10);
+        round.setCommitDeadline(OffsetDateTime.now().minusMinutes(40));
+
+        Pair pair = new Pair();
+        pair.setId(101);
+        pair.setRound(round);
+        pair.setPostA(posts.get(0));
+        pair.setPostB(posts.get(1));
+        pair.setIsGolden(false);
+        pair.setIsAudit(false);
+
+        Curator revealedCurator = createCurator("wallet-revealed-2", 1, 12, new BigDecimal("0.80"));
+        Curator nonRevealCurator = createCurator("wallet-nonreveal-2", 1, 13, new BigDecimal("0.60"));
+        nonRevealCurator.setLost(2_000_000_000L);
+
+        Commitment revealed = createCommitment(pair, "wallet-revealed-2", PairWinner.A, 1_000_000_000L, true);
+        Commitment nonRevealed = createCommitment(pair, "wallet-nonreveal-2", null, 2_000_000_000L, false);
+        nonRevealed.setCommittedAt(OffsetDateTime.now().minusMinutes(50));
+        nonRevealed.setNonRevealPenalized(true);
+        nonRevealed.setNonRevealPenalizedAt(OffsetDateTime.now().minusMinutes(5));
+
+        when(roundRepository.findById(5)).thenReturn(Optional.of(round));
+        when(roundRepository.findByStatus(RoundStatus.SETTLING)).thenReturn(List.of(round));
+        when(globalPoolRepository.findById(1)).thenReturn(Optional.of(globalPool));
+        when(marketRepository.findAll()).thenReturn(List.of(market));
+        when(pairRepository.findByRoundId(5)).thenReturn(List.of(pair));
+        when(commitmentRepository.findByPairId(101)).thenReturn(List.of(revealed, nonRevealed));
+        when(curatorRepository.findById(any(CuratorId.class))).thenAnswer(inv -> {
+            CuratorId id = inv.getArgument(0);
+            if ("wallet-revealed-2".equals(id.getWallet())) return Optional.of(revealedCurator);
+            if ("wallet-nonreveal-2".equals(id.getWallet())) return Optional.of(nonRevealCurator);
+            return Optional.empty();
+        });
+        when(postRepository.findById(posts.get(0).getId())).thenReturn(Optional.of(posts.get(0)));
+        when(postRepository.findById(posts.get(1).getId())).thenReturn(Optional.of(posts.get(1)));
+        when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(pairRepository.save(any(Pair.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(curatorRepository.save(any(Curator.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(globalPoolRepository.save(any(GlobalPool.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(roundRepository.save(any(Round.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String hash = settlementService.settleRound(5);
+
+        assertNotNull(hash);
+        assertEquals(2_000_000_000L, nonRevealCurator.getLost(),
+                "Already-penalized non-reveal should not be charged twice");
     }
 
     @Test

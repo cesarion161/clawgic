@@ -59,4 +59,10 @@ public class Commitment {
     @Column(name = "auto_reveal_failed_at")
     private OffsetDateTime autoRevealFailedAt;
 
+    @Column(name = "non_reveal_penalized", nullable = false)
+    private Boolean nonRevealPenalized = false;
+
+    @Column(name = "non_reveal_penalized_at")
+    private OffsetDateTime nonRevealPenalizedAt;
+
 }

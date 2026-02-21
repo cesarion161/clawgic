@@ -52,5 +52,12 @@ moltrank:
     fetch-limit: 100
     initial-delay-ms: 60000
     interval-ms: 300000
+  reveal:
+    grace-period-minutes: 30
+    max-retries: 3
+    retry-delay-seconds: 5
+    penalty-enforcement-enabled: true
+    penalty-initial-delay-ms: 60000
+    penalty-interval-ms: 60000
   moltbook:
     # api-url: https://api.moltbook.com  # Uncomment when real Moltbook API is available
