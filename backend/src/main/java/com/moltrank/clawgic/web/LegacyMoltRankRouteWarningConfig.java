@@ -1,6 +1,7 @@
 package com.moltrank.clawgic.web;
 
 import com.moltrank.clawgic.config.ClawgicRuntimeProperties;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -10,6 +11,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * remain on the intended path without disabling existing endpoints yet.
  */
 @Configuration
+@ConditionalOnBean(ClawgicRuntimeProperties.class)
 public class LegacyMoltRankRouteWarningConfig implements WebMvcConfigurer {
 
     private final ClawgicRuntimeProperties clawgicRuntimeProperties;

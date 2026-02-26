@@ -19,11 +19,11 @@ describe('Navbar', () => {
     expect(screen.getByRole('link', { name: 'Shell' })).toHaveAttribute('href', '/clawgic')
     expect(screen.getByText('Legacy MoltRank')).toBeInTheDocument()
 
-    expect(screen.getByRole('link', { name: /FeedLegacy/i, hidden: true })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Feed\s*Legacy/i, hidden: true })).toHaveAttribute(
       'href',
       '/feed'
     )
-    expect(screen.getByRole('link', { name: /CurateLegacy/i, hidden: true })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Curate\s*Legacy/i, hidden: true })).toHaveAttribute(
       'href',
       '/curate'
     )
