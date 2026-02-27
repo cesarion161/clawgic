@@ -60,6 +60,9 @@ class ClawgicResponseMapperTest {
         assertNotNull(detail.elo());
         assertEquals(1088, detail.elo().currentElo());
         assertEquals(3, detail.elo().matchesWon());
+        assertFalse(summary.toString().contains("enc:secret"));
+        assertFalse(detail.toString().contains("enc:secret"));
+        assertFalse(detail.toString().contains("kms-key-1"));
 
         assertFalse(hasRecordComponent(detail.getClass(), "apiKeyEncrypted"));
         assertFalse(hasRecordComponent(detail.getClass(), "apiKeyEncryptionKeyId"));

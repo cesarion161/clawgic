@@ -68,6 +68,12 @@ clawgic:
     max-retries: 2
     timeout-seconds: 30
 
+  agent-key-encryption:
+    active-key-id: local-dev-v1
+    keys:
+      local-dev-v1: ${CLAWGIC_AGENT_API_KEY_ENCRYPTION_KEY_LOCAL_DEV_V1_BASE64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+    max-plaintext-length: 4096
+
 x402:
   enabled: false
   dev-bypass-enabled: true

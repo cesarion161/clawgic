@@ -18,6 +18,7 @@ class ClawgicConfigurationPropertiesTest {
             .withUserConfiguration(
                     ClawgicRuntimeProperties.class,
                     ClawgicJudgeProperties.class,
+                    ClawgicAgentKeyEncryptionProperties.class,
                     X402Properties.class
             );
 
@@ -26,6 +27,7 @@ class ClawgicConfigurationPropertiesTest {
         contextRunner.run(context -> {
             assertTrue(context.containsBean("clawgicRuntimeProperties"));
             assertTrue(context.containsBean("clawgicJudgeProperties"));
+            assertTrue(context.containsBean("clawgicAgentKeyEncryptionProperties"));
             assertTrue(context.containsBean("x402Properties"));
         });
     }
@@ -35,6 +37,8 @@ class ClawgicConfigurationPropertiesTest {
         contextRunner.run(context -> {
             ClawgicRuntimeProperties clawgic = context.getBean(ClawgicRuntimeProperties.class);
             ClawgicJudgeProperties judge = context.getBean(ClawgicJudgeProperties.class);
+            ClawgicAgentKeyEncryptionProperties apiKeyEncryption =
+                    context.getBean(ClawgicAgentKeyEncryptionProperties.class);
             X402Properties x402 = context.getBean(X402Properties.class);
 
             assertFalse(clawgic.isEnabled());
@@ -48,6 +52,14 @@ class ClawgicConfigurationPropertiesTest {
             assertEquals("gpt-4o", judge.getModel());
             assertTrue(judge.isStrictJson());
             assertEquals(2, judge.getMaxRetries());
+
+            assertEquals("local-dev-v1", apiKeyEncryption.getActiveKeyId());
+            assertEquals(4096, apiKeyEncryption.getMaxPlaintextLength());
+            assertTrue(apiKeyEncryption.getKeys().containsKey("local-dev-v1"));
+            assertEquals(
+                    ClawgicAgentKeyEncryptionProperties.DEFAULT_LOCAL_DEV_KEY_BASE64,
+                    apiKeyEncryption.getKeys().get("local-dev-v1")
+            );
 
             assertFalse(x402.isEnabled());
             assertTrue(x402.isDevBypassEnabled());
@@ -70,6 +82,9 @@ class ClawgicConfigurationPropertiesTest {
                         "clawgic.debate.provider-timeout-seconds=20",
                         "clawgic.judge.model=gpt-4.1",
                         "clawgic.judge.max-retries=4",
+                        "clawgic.agent-key-encryption.active-key-id=rotate-v2",
+                        "clawgic.agent-key-encryption.keys.rotate-v2=ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4NzY1NDMyMTA=",
+                        "clawgic.agent-key-encryption.max-plaintext-length=2048",
                         "x402.enabled=true",
                         "x402.dev-bypass-enabled=false",
                         "x402.network=base-mainnet",
@@ -79,6 +94,8 @@ class ClawgicConfigurationPropertiesTest {
                 .run(context -> {
                     ClawgicRuntimeProperties clawgic = context.getBean(ClawgicRuntimeProperties.class);
                     ClawgicJudgeProperties judge = context.getBean(ClawgicJudgeProperties.class);
+                    ClawgicAgentKeyEncryptionProperties apiKeyEncryption =
+                            context.getBean(ClawgicAgentKeyEncryptionProperties.class);
                     X402Properties x402 = context.getBean(X402Properties.class);
 
                     assertTrue(clawgic.isEnabled());
@@ -90,6 +107,13 @@ class ClawgicConfigurationPropertiesTest {
 
                     assertEquals("gpt-4.1", judge.getModel());
                     assertEquals(4, judge.getMaxRetries());
+
+                    assertEquals("rotate-v2", apiKeyEncryption.getActiveKeyId());
+                    assertEquals(2048, apiKeyEncryption.getMaxPlaintextLength());
+                    assertEquals(
+                            "ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4NzY1NDMyMTA=",
+                            apiKeyEncryption.getKeys().get("rotate-v2")
+                    );
 
                     assertTrue(x402.isEnabled());
                     assertFalse(x402.isDevBypassEnabled());

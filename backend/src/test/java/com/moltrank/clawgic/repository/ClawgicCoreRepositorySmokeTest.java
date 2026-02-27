@@ -3,6 +3,7 @@ package com.moltrank.clawgic.repository;
 import com.moltrank.clawgic.model.ClawgicAgent;
 import com.moltrank.clawgic.model.ClawgicAgentElo;
 import com.moltrank.clawgic.model.ClawgicUser;
+import com.moltrank.clawgic.service.ClawgicAgentApiKeyCryptoService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = {
@@ -40,6 +42,9 @@ class ClawgicCoreRepositorySmokeTest {
 
     @Autowired
     private ClawgicAgentEloRepository clawgicAgentEloRepository;
+
+    @Autowired
+    private ClawgicAgentApiKeyCryptoService clawgicAgentApiKeyCryptoService;
 
     @Test
     void flywayCreatesClawgicCoreTablesAndRepositoriesRoundTripRecords() {
@@ -88,5 +93,33 @@ class ClawgicCoreRepositorySmokeTest {
         assertEquals(0, persistedElo.getMatchesPlayed());
         assertEquals(0, persistedElo.getMatchesWon());
         assertEquals(0, persistedElo.getMatchesForfeited());
+    }
+
+    @Test
+    void agentApiKeyEncryptionStorageContractRoundTripsThroughRepository() {
+        String walletAddress = "0x2222222222222222222222222222222222222222";
+        UUID agentId = UUID.randomUUID();
+
+        ClawgicUser user = new ClawgicUser();
+        user.setWalletAddress(walletAddress);
+        clawgicUserRepository.saveAndFlush(user);
+
+        ClawgicAgent agent = new ClawgicAgent();
+        agent.setAgentId(agentId);
+        agent.setWalletAddress(walletAddress);
+        agent.setName("Encrypted Key Agent");
+        agent.setSystemPrompt("Debate with evidence.");
+        agent.setPersona("Structured");
+        clawgicAgentApiKeyCryptoService.applyEncryptedApiKey(agent, "  sk-live-c15-storage-contract  ");
+
+        clawgicAgentRepository.saveAndFlush(agent);
+
+        ClawgicAgent persistedAgent = clawgicAgentRepository.findById(agentId).orElseThrow();
+        assertFalse(persistedAgent.getApiKeyEncrypted().contains("sk-live-c15-storage-contract"));
+        assertTrue(persistedAgent.getApiKeyEncrypted().contains("\"alg\":\"AES-256-GCM\""));
+        assertEquals(
+                "sk-live-c15-storage-contract",
+                clawgicAgentApiKeyCryptoService.decryptFromStorage(persistedAgent)
+        );
     }
 }
