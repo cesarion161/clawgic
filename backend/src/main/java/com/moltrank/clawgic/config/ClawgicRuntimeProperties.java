@@ -5,6 +5,8 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+
 /**
  * Clawgic runtime feature flags and execution defaults.
  * These are introduced ahead of the Clawgic domain implementation to allow
@@ -50,6 +52,8 @@ public class ClawgicRuntimeProperties {
     public static class Tournament {
         private int mvpBracketSize = 4;
         private int defaultEntryWindowMinutes = 60;
+        private BigDecimal judgeFeeUsdcPerCompletedMatch = new BigDecimal("0.250000");
+        private BigDecimal systemRetentionRate = new BigDecimal("0.000000");
     }
 
     @Getter

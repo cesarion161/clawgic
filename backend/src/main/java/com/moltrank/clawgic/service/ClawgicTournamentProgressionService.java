@@ -26,6 +26,7 @@ public class ClawgicTournamentProgressionService {
 
     private final ClawgicTournamentRepository clawgicTournamentRepository;
     private final ClawgicMatchRepository clawgicMatchRepository;
+    private final ClawgicSettlementAccountingService clawgicSettlementAccountingService;
 
     public boolean completeTournamentIfResolved(UUID tournamentId, OffsetDateTime now) {
         ClawgicTournament tournament = clawgicTournamentRepository.findByTournamentIdForUpdate(tournamentId).orElse(null);
@@ -62,6 +63,7 @@ public class ClawgicTournamentProgressionService {
         tournament.setCompletedAt(now);
         tournament.setUpdatedAt(now);
         clawgicTournamentRepository.save(tournament);
+        clawgicSettlementAccountingService.settleTournamentIfCompleted(tournamentId, now);
         return true;
     }
 

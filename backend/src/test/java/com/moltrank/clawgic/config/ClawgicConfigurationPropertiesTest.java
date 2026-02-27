@@ -49,6 +49,8 @@ class ClawgicConfigurationPropertiesTest {
             assertTrue(clawgic.isMockProvider());
             assertTrue(clawgic.isMockJudge());
             assertEquals(4, clawgic.getTournament().getMvpBracketSize());
+            assertEquals(new BigDecimal("0.250000"), clawgic.getTournament().getJudgeFeeUsdcPerCompletedMatch());
+            assertEquals(new BigDecimal("0.000000"), clawgic.getTournament().getSystemRetentionRate());
             assertEquals("in_memory", clawgic.getWorker().getQueueMode());
             assertEquals(3, clawgic.getDebate().getMaxExchangesPerAgent());
             assertEquals(180, clawgic.getDebate().getMaxResponseWords());
@@ -89,6 +91,8 @@ class ClawgicConfigurationPropertiesTest {
                         "clawgic.enabled=true",
                         "clawgic.mock-provider=false",
                         "clawgic.mock-judge=false",
+                        "clawgic.tournament.judge-fee-usdc-per-completed-match=0.375000",
+                        "clawgic.tournament.system-retention-rate=0.125000",
                         "clawgic.worker.enabled=true",
                         "clawgic.worker.queue-mode=redis",
                         "clawgic.debate.max-exchanges-per-agent=4",
@@ -122,6 +126,8 @@ class ClawgicConfigurationPropertiesTest {
                     assertTrue(clawgic.isEnabled());
                     assertFalse(clawgic.isMockProvider());
                     assertFalse(clawgic.isMockJudge());
+                    assertEquals(new BigDecimal("0.375000"), clawgic.getTournament().getJudgeFeeUsdcPerCompletedMatch());
+                    assertEquals(new BigDecimal("0.125000"), clawgic.getTournament().getSystemRetentionRate());
                     assertTrue(clawgic.getWorker().isEnabled());
                     assertEquals("redis", clawgic.getWorker().getQueueMode());
                     assertEquals(4, clawgic.getDebate().getMaxExchangesPerAgent());

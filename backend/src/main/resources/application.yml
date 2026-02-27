@@ -51,6 +51,8 @@ clawgic:
   tournament:
     mvp-bracket-size: 4
     default-entry-window-minutes: 60
+    judge-fee-usdc-per-completed-match: 0.250000
+    system-retention-rate: 0.000000
   worker:
     enabled: false
     initial-delay-ms: 5000
