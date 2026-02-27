@@ -7,7 +7,8 @@ set -euo pipefail
 # - /actuator/health should be 200 when backend is up.
 # - /api/clawgic/health should be 200 (Step C04 stub endpoint).
 # - /api/clawgic/agents should be 200 (Step C16).
-# - /api/clawgic/{tournaments,matches} may be 404 until those APIs land.
+# - /api/clawgic/tournaments should be 200 (Step C17).
+# - /api/clawgic/matches may be 404 until that API lands.
 # - tournament entry POST may return 404 (route missing) or 402 (x402 challenge path).
 #
 # The script fails on unexpected statuses and always treats any 5xx as a failure.
@@ -129,8 +130,11 @@ run_checks() {
   # Agent list endpoint is required from Step C16.
   assert_request "agents-list" "GET" "/api/clawgic/agents" "200"
 
+  # Tournament list endpoint is required from Step C17.
+  assert_request "tournaments-list" "GET" "/api/clawgic/tournaments" "200"
+  assert_request "tournaments-create-validation" "POST" "/api/clawgic/tournaments" "400" '{}'
+
   # Placeholder-safe list endpoints: absent routes are expected early in the plan.
-  assert_request "tournaments-list" "GET" "/api/clawgic/tournaments" "200|404"
   assert_request "matches-list" "GET" "/api/clawgic/matches" "200|404"
 
   # x402 entry route placeholder: 404 before implementation, 402 once challenge flow exists.
