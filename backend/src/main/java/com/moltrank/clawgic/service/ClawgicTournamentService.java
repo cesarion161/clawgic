@@ -26,6 +26,7 @@ import com.moltrank.clawgic.repository.ClawgicPaymentAuthorizationRepository;
 import com.moltrank.clawgic.repository.ClawgicStakingLedgerRepository;
 import com.moltrank.clawgic.repository.ClawgicTournamentEntryRepository;
 import com.moltrank.clawgic.repository.ClawgicTournamentRepository;
+import com.moltrank.clawgic.web.X402PaymentRequestException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +57,7 @@ public class ClawgicTournamentService {
     private final ClawgicResponseMapper clawgicResponseMapper;
     private final ClawgicRuntimeProperties clawgicRuntimeProperties;
     private final X402Properties x402Properties;
+    private final X402PaymentAuthorizationAttemptService x402PaymentAuthorizationAttemptService;
 
     public ClawgicTournamentService(
             ClawgicAgentRepository clawgicAgentRepository,
@@ -68,7 +70,8 @@ public class ClawgicTournamentService {
             ClawgicTournamentBracketBuilder clawgicTournamentBracketBuilder,
             ClawgicResponseMapper clawgicResponseMapper,
             ClawgicRuntimeProperties clawgicRuntimeProperties,
-            X402Properties x402Properties
+            X402Properties x402Properties,
+            X402PaymentAuthorizationAttemptService x402PaymentAuthorizationAttemptService
     ) {
         this.clawgicAgentRepository = clawgicAgentRepository;
         this.clawgicAgentEloRepository = clawgicAgentEloRepository;
@@ -81,6 +84,7 @@ public class ClawgicTournamentService {
         this.clawgicResponseMapper = clawgicResponseMapper;
         this.clawgicRuntimeProperties = clawgicRuntimeProperties;
         this.x402Properties = x402Properties;
+        this.x402PaymentAuthorizationAttemptService = x402PaymentAuthorizationAttemptService;
     }
 
     @Transactional
@@ -137,7 +141,15 @@ public class ClawgicTournamentService {
             UUID tournamentId,
             ClawgicTournamentRequests.EnterTournamentRequest request
     ) {
-        requireDevBypassModeEnabled();
+        return enterTournament(tournamentId, request, null);
+    }
+
+    @Transactional
+    public ClawgicTournamentResponses.TournamentEntry enterTournament(
+            UUID tournamentId,
+            ClawgicTournamentRequests.EnterTournamentRequest request,
+            String paymentHeaderValue
+    ) {
 
         ClawgicTournament tournament = clawgicTournamentRepository.findById(tournamentId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -185,6 +197,19 @@ public class ClawgicTournamentService {
         int seedSnapshotElo = clawgicAgentEloRepository.findById(agentId)
                 .map(ClawgicAgentElo::getCurrentElo)
                 .orElse(DEFAULT_ELO);
+
+        if (x402Properties.isEnabled()) {
+            x402PaymentAuthorizationAttemptService.recordPendingVerificationAttempt(
+                    tournamentId,
+                    agentId,
+                    agent.getWalletAddress(),
+                    tournament.getBaseEntryFeeUsdc(),
+                    paymentHeaderValue
+            );
+            throw X402PaymentRequestException.verificationPending();
+        }
+
+        requireDevBypassModeEnabled();
 
         ClawgicTournamentEntry entry = new ClawgicTournamentEntry();
         entry.setEntryId(UUID.randomUUID());

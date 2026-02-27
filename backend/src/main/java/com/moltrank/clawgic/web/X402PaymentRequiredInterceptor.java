@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -21,6 +22,7 @@ import java.util.UUID;
 public class X402PaymentRequiredInterceptor implements HandlerInterceptor {
 
     private static final String CHALLENGE_SCHEME = "x402";
+    public static final String PAYMENT_HEADER_REQUEST_ATTRIBUTE = "x402.paymentHeaderValue";
 
     private final X402Properties x402Properties;
 
@@ -40,6 +42,7 @@ public class X402PaymentRequiredInterceptor implements HandlerInterceptor {
 
         String paymentHeaderValue = request.getHeader(x402Properties.getPaymentHeaderName());
         if (paymentHeaderValue != null && !paymentHeaderValue.isBlank()) {
+            request.setAttribute(PAYMENT_HEADER_REQUEST_ATTRIBUTE, paymentHeaderValue);
             return true;
         }
 
@@ -66,10 +69,7 @@ public class X402PaymentRequiredInterceptor implements HandlerInterceptor {
     }
 
     private BigDecimal scaleUsdc(BigDecimal amount) {
-        if (amount == null) {
-            return BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP);
-        }
-        return amount.setScale(6, RoundingMode.HALF_UP);
+        return Objects.requireNonNullElse(amount, BigDecimal.ZERO).setScale(6, RoundingMode.HALF_UP);
     }
 
     private String toJson(PaymentRequiredChallenge challenge) {

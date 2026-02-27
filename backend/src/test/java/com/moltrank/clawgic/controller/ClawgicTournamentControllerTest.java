@@ -112,7 +112,7 @@ class ClawgicTournamentControllerTest {
     void enterTournamentReturnsCreatedPayload() throws Exception {
         UUID tournamentId = UUID.fromString("00000000-0000-0000-0000-000000000420");
         UUID agentId = UUID.fromString("00000000-0000-0000-0000-000000000421");
-        when(clawgicTournamentService.enterTournament(any(), any()))
+        when(clawgicTournamentService.enterTournament(any(), any(), any()))
                 .thenReturn(sampleEntry(tournamentId, agentId));
 
         mockMvc.perform(post("/api/clawgic/tournaments/{tournamentId}/enter", tournamentId)
@@ -132,7 +132,7 @@ class ClawgicTournamentControllerTest {
     @Test
     void enterTournamentDuplicateEntryReturnsConflict() throws Exception {
         UUID tournamentId = UUID.fromString("00000000-0000-0000-0000-000000000422");
-        when(clawgicTournamentService.enterTournament(any(), any()))
+        when(clawgicTournamentService.enterTournament(any(), any(), any()))
                 .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Agent is already entered"));
 
         mockMvc.perform(post("/api/clawgic/tournaments/{tournamentId}/enter", tournamentId)
@@ -148,7 +148,7 @@ class ClawgicTournamentControllerTest {
     @Test
     void enterTournamentCapacityExceededReturnsConflict() throws Exception {
         UUID tournamentId = UUID.fromString("00000000-0000-0000-0000-000000000423");
-        when(clawgicTournamentService.enterTournament(any(), any()))
+        when(clawgicTournamentService.enterTournament(any(), any(), any()))
                 .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Tournament entry capacity reached"));
 
         mockMvc.perform(post("/api/clawgic/tournaments/{tournamentId}/enter", tournamentId)

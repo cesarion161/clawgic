@@ -19,6 +19,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -78,7 +79,7 @@ class X402PaymentRequiredInterceptorWebMvcTest {
                 .andExpect(jsonPath("$.nonce").isString())
                 .andExpect(jsonPath("$.challengeExpiresAt").isString());
 
-        verify(clawgicTournamentService, never()).enterTournament(any(), any());
+        verify(clawgicTournamentService, never()).enterTournament(any(), any(), anyString());
     }
 
     @Test
@@ -86,7 +87,7 @@ class X402PaymentRequiredInterceptorWebMvcTest {
         UUID tournamentId = UUID.fromString("00000000-0000-0000-0000-000000000502");
         UUID agentId = UUID.fromString("00000000-0000-0000-0000-000000000512");
 
-        when(clawgicTournamentService.enterTournament(any(), any()))
+        when(clawgicTournamentService.enterTournament(any(), any(), any()))
                 .thenReturn(new ClawgicTournamentResponses.TournamentEntry(
                         UUID.fromString("00000000-0000-0000-0000-000000000513"),
                         tournamentId,
@@ -110,5 +111,29 @@ class X402PaymentRequiredInterceptorWebMvcTest {
                 .andExpect(jsonPath("$.tournamentId").value(tournamentId.toString()))
                 .andExpect(jsonPath("$.agentId").value(agentId.toString()))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
+    }
+
+    @Test
+    void malformedPaymentHeaderReturnsExplicitErrorPayload() throws Exception {
+        UUID tournamentId = UUID.fromString("00000000-0000-0000-0000-000000000503");
+
+        x402Properties.setEnabled(true);
+        x402Properties.setDevBypassEnabled(false);
+
+        when(clawgicTournamentService.enterTournament(any(), any(), any()))
+                .thenThrow(X402PaymentRequestException.malformedHeader("X-PAYMENT header must be valid JSON"));
+
+        mockMvc.perform(post("/api/clawgic/tournaments/{tournamentId}/enter", tournamentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-PAYMENT", "not-json")
+                        .content("""
+                                {
+                                  "agentId": "00000000-0000-0000-0000-000000000511"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("x402_malformed_payment_header"))
+                .andExpect(jsonPath("$.message").value("X-PAYMENT header must be valid JSON"));
     }
 }
