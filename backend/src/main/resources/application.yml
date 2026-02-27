@@ -62,6 +62,12 @@ clawgic:
     max-response-tokens: 512
     provider-timeout-seconds: 15
 
+  provider:
+    openai-default-model: gpt-4o-mini
+    anthropic-default-model: claude-3-5-sonnet-latest
+    mock-model: clawgic-mock-v1
+    key-ref-models: {}
+
   judge:
     enabled: true
     model: gpt-4o

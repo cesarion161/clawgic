@@ -17,6 +17,7 @@ class ClawgicConfigurationPropertiesTest {
             .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
             .withUserConfiguration(
                     ClawgicRuntimeProperties.class,
+                    ClawgicProviderProperties.class,
                     ClawgicJudgeProperties.class,
                     ClawgicAgentKeyEncryptionProperties.class,
                     X402Properties.class
@@ -26,6 +27,7 @@ class ClawgicConfigurationPropertiesTest {
     void contextStartsWithClawgicAndX402PropertyBeans() {
         contextRunner.run(context -> {
             assertTrue(context.containsBean("clawgicRuntimeProperties"));
+            assertTrue(context.containsBean("clawgicProviderProperties"));
             assertTrue(context.containsBean("clawgicJudgeProperties"));
             assertTrue(context.containsBean("clawgicAgentKeyEncryptionProperties"));
             assertTrue(context.containsBean("x402Properties"));
@@ -36,6 +38,7 @@ class ClawgicConfigurationPropertiesTest {
     void bindsDefaultValues() {
         contextRunner.run(context -> {
             ClawgicRuntimeProperties clawgic = context.getBean(ClawgicRuntimeProperties.class);
+            ClawgicProviderProperties provider = context.getBean(ClawgicProviderProperties.class);
             ClawgicJudgeProperties judge = context.getBean(ClawgicJudgeProperties.class);
             ClawgicAgentKeyEncryptionProperties apiKeyEncryption =
                     context.getBean(ClawgicAgentKeyEncryptionProperties.class);
@@ -49,6 +52,11 @@ class ClawgicConfigurationPropertiesTest {
             assertEquals(3, clawgic.getDebate().getMaxExchangesPerAgent());
             assertEquals(180, clawgic.getDebate().getMaxResponseWords());
             assertEquals(512, clawgic.getDebate().getMaxResponseTokens());
+
+            assertEquals("gpt-4o-mini", provider.getOpenaiDefaultModel());
+            assertEquals("claude-3-5-sonnet-latest", provider.getAnthropicDefaultModel());
+            assertEquals("clawgic-mock-v1", provider.getMockModel());
+            assertTrue(provider.getKeyRefModels().isEmpty());
 
             assertTrue(judge.isEnabled());
             assertEquals("gpt-4o", judge.getModel());
@@ -84,6 +92,10 @@ class ClawgicConfigurationPropertiesTest {
                         "clawgic.debate.max-exchanges-per-agent=4",
                         "clawgic.debate.max-response-words=220",
                         "clawgic.debate.provider-timeout-seconds=20",
+                        "clawgic.provider.openai-default-model=gpt-4.1-mini",
+                        "clawgic.provider.anthropic-default-model=claude-3-7-sonnet-latest",
+                        "clawgic.provider.mock-model=clawgic-mock-v2",
+                        "clawgic.provider.key-ref-models[team/openai/primary]=gpt-4.1",
                         "clawgic.judge.model=gpt-4.1",
                         "clawgic.judge.max-retries=4",
                         "clawgic.agent-key-encryption.active-key-id=rotate-v2",
@@ -97,6 +109,7 @@ class ClawgicConfigurationPropertiesTest {
                 )
                 .run(context -> {
                     ClawgicRuntimeProperties clawgic = context.getBean(ClawgicRuntimeProperties.class);
+                    ClawgicProviderProperties provider = context.getBean(ClawgicProviderProperties.class);
                     ClawgicJudgeProperties judge = context.getBean(ClawgicJudgeProperties.class);
                     ClawgicAgentKeyEncryptionProperties apiKeyEncryption =
                             context.getBean(ClawgicAgentKeyEncryptionProperties.class);
@@ -110,6 +123,11 @@ class ClawgicConfigurationPropertiesTest {
                     assertEquals(4, clawgic.getDebate().getMaxExchangesPerAgent());
                     assertEquals(220, clawgic.getDebate().getMaxResponseWords());
                     assertEquals(20, clawgic.getDebate().getProviderTimeoutSeconds());
+
+                    assertEquals("gpt-4.1-mini", provider.getOpenaiDefaultModel());
+                    assertEquals("claude-3-7-sonnet-latest", provider.getAnthropicDefaultModel());
+                    assertEquals("clawgic-mock-v2", provider.getMockModel());
+                    assertEquals("gpt-4.1", provider.getKeyRefModels().get("team/openai/primary"));
 
                     assertEquals("gpt-4.1", judge.getModel());
                     assertEquals(4, judge.getMaxRetries());
