@@ -3,13 +3,16 @@ package com.moltrank.clawgic.repository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.moltrank.clawgic.model.ClawgicAgent;
 import com.moltrank.clawgic.model.ClawgicMatch;
 import com.moltrank.clawgic.model.ClawgicMatchStatus;
 import com.moltrank.clawgic.model.ClawgicTournament;
 import com.moltrank.clawgic.model.ClawgicTournamentStatus;
 import com.moltrank.clawgic.model.ClawgicUser;
+import com.moltrank.clawgic.model.DebatePhase;
+import com.moltrank.clawgic.model.DebateTranscriptJsonCodec;
+import com.moltrank.clawgic.model.DebateTranscriptMessage;
+import com.moltrank.clawgic.model.DebateTranscriptRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -79,15 +82,28 @@ class ClawgicMatchRepositorySmokeTest {
                 now.plusMinutes(30)
         );
 
-        ArrayNode transcript = OBJECT_MAPPER.createArrayNode();
-        transcript.add(messageNode("system", "THESIS_DISCOVERY", "Stay concise and logical."));
-        transcript.add(messageNode("agent1", "THESIS_DISCOVERY", "Determinism is necessary for debugging."));
-        transcript.add(messageNode("agent2", "THESIS_DISCOVERY", "Live variance is part of real-world validation."));
+        ArrayNode transcript = DebateTranscriptJsonCodec.toJson(List.of(
+                new DebateTranscriptMessage(
+                        DebateTranscriptRole.SYSTEM,
+                        DebatePhase.THESIS_DISCOVERY,
+                        "Stay concise and logical."
+                ),
+                new DebateTranscriptMessage(
+                        DebateTranscriptRole.AGENT_1,
+                        DebatePhase.THESIS_DISCOVERY,
+                        "Determinism is necessary for debugging."
+                ),
+                new DebateTranscriptMessage(
+                        DebateTranscriptRole.AGENT_2,
+                        DebatePhase.THESIS_DISCOVERY,
+                        "Live variance is part of real-world validation."
+                )
+        ));
 
-        ObjectNode judgeResult = OBJECT_MAPPER.createObjectNode();
+        var judgeResult = OBJECT_MAPPER.createObjectNode();
         judgeResult.put("winner_id", agent1Id.toString());
         judgeResult.put("reasoning", "Agent1 directly addressed reproducibility tradeoffs.");
-        ObjectNode scores = judgeResult.putObject("scores");
+        var scores = judgeResult.putObject("scores");
         scores.put("agent1_logic", 9);
         scores.put("agent2_logic", 7);
 
@@ -100,7 +116,7 @@ class ClawgicMatchRepositorySmokeTest {
         match.setBracketRound(1);
         match.setBracketPosition(1);
         match.setStatus(ClawgicMatchStatus.COMPLETED);
-        match.setPhase("CONCLUSION");
+        match.setPhase(DebatePhase.CONCLUSION);
         match.setTranscriptJson(transcript);
         match.setJudgeResultJson(judgeResult);
         match.setWinnerAgentId(agent1Id);
@@ -120,7 +136,7 @@ class ClawgicMatchRepositorySmokeTest {
         assertEquals(ClawgicMatchStatus.COMPLETED, persisted.getStatus());
         assertEquals(1, persisted.getBracketRound());
         assertEquals(1, persisted.getBracketPosition());
-        assertEquals("CONCLUSION", persisted.getPhase());
+        assertEquals(DebatePhase.CONCLUSION, persisted.getPhase());
         assertEquals(agent1Id, persisted.getWinnerAgentId());
         assertEquals(1, persisted.getJudgeRetryCount());
         assertJsonEquals(transcript, persisted.getTranscriptJson());
@@ -151,14 +167,6 @@ class ClawgicMatchRepositorySmokeTest {
                         matchId
                 )
         );
-    }
-
-    private static ObjectNode messageNode(String role, String phase, String content) {
-        ObjectNode message = OBJECT_MAPPER.createObjectNode();
-        message.put("role", role);
-        message.put("phase", phase);
-        message.put("content", content);
-        return message;
     }
 
     private static void assertJsonEquals(JsonNode expected, JsonNode actual) {

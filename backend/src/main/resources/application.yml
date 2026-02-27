@@ -58,6 +58,7 @@ clawgic:
     queue-mode: in_memory
   debate:
     max-exchanges-per-agent: 3
+    max-response-words: 180
     max-response-tokens: 512
     provider-timeout-seconds: 15
 

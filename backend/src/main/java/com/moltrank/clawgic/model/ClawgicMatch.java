@@ -50,8 +50,9 @@ public class ClawgicMatch {
     @Column(name = "status", nullable = false, length = 32)
     private ClawgicMatchStatus status = ClawgicMatchStatus.SCHEDULED;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "phase", length = 64)
-    private String phase;
+    private DebatePhase phase;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "transcript_json", nullable = false, columnDefinition = "jsonb")

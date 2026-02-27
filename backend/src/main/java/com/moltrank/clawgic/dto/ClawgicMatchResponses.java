@@ -1,6 +1,7 @@
 package com.moltrank.clawgic.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.moltrank.clawgic.model.DebatePhase;
 import com.moltrank.clawgic.model.ClawgicMatchStatus;
 
 import java.time.OffsetDateTime;
@@ -21,7 +22,7 @@ public final class ClawgicMatchResponses {
             UUID nextMatchId,
             Integer nextMatchAgentSlot,
             ClawgicMatchStatus status,
-            String phase,
+            DebatePhase phase,
             UUID winnerAgentId,
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt
@@ -38,7 +39,7 @@ public final class ClawgicMatchResponses {
             UUID nextMatchId,
             Integer nextMatchAgentSlot,
             ClawgicMatchStatus status,
-            String phase,
+            DebatePhase phase,
             JsonNode transcriptJson,
             JsonNode judgeResultJson,
             UUID winnerAgentId,

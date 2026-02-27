@@ -65,6 +65,7 @@ public class ClawgicRuntimeProperties {
     @Setter
     public static class Debate {
         private int maxExchangesPerAgent = 3;
+        private int maxResponseWords = 180;
         private int maxResponseTokens = 512;
         private int providerTimeoutSeconds = 15;
     }

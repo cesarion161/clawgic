@@ -47,6 +47,8 @@ class ClawgicConfigurationPropertiesTest {
             assertEquals(4, clawgic.getTournament().getMvpBracketSize());
             assertEquals("in_memory", clawgic.getWorker().getQueueMode());
             assertEquals(3, clawgic.getDebate().getMaxExchangesPerAgent());
+            assertEquals(180, clawgic.getDebate().getMaxResponseWords());
+            assertEquals(512, clawgic.getDebate().getMaxResponseTokens());
 
             assertTrue(judge.isEnabled());
             assertEquals("gpt-4o", judge.getModel());
@@ -79,6 +81,8 @@ class ClawgicConfigurationPropertiesTest {
                         "clawgic.mock-judge=false",
                         "clawgic.worker.enabled=true",
                         "clawgic.worker.queue-mode=redis",
+                        "clawgic.debate.max-exchanges-per-agent=4",
+                        "clawgic.debate.max-response-words=220",
                         "clawgic.debate.provider-timeout-seconds=20",
                         "clawgic.judge.model=gpt-4.1",
                         "clawgic.judge.max-retries=4",
@@ -103,6 +107,8 @@ class ClawgicConfigurationPropertiesTest {
                     assertFalse(clawgic.isMockJudge());
                     assertTrue(clawgic.getWorker().isEnabled());
                     assertEquals("redis", clawgic.getWorker().getQueueMode());
+                    assertEquals(4, clawgic.getDebate().getMaxExchangesPerAgent());
+                    assertEquals(220, clawgic.getDebate().getMaxResponseWords());
                     assertEquals(20, clawgic.getDebate().getProviderTimeoutSeconds());
 
                     assertEquals("gpt-4.1", judge.getModel());
