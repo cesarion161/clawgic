@@ -2,6 +2,7 @@ package com.moltrank.clawgic.service;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.moltrank.clawgic.model.ClawgicAgent;
+import com.moltrank.clawgic.model.ClawgicAgentElo;
 import com.moltrank.clawgic.model.ClawgicMatch;
 import com.moltrank.clawgic.model.ClawgicMatchJudgement;
 import com.moltrank.clawgic.model.ClawgicMatchJudgementStatus;
@@ -15,6 +16,7 @@ import com.moltrank.clawgic.model.DebateTranscriptJsonCodec;
 import com.moltrank.clawgic.model.DebateTranscriptMessage;
 import com.moltrank.clawgic.model.DebateTranscriptRole;
 import com.moltrank.clawgic.provider.MockClawgicJudgeProviderClient;
+import com.moltrank.clawgic.repository.ClawgicAgentEloRepository;
 import com.moltrank.clawgic.repository.ClawgicAgentRepository;
 import com.moltrank.clawgic.repository.ClawgicMatchJudgementRepository;
 import com.moltrank.clawgic.repository.ClawgicMatchRepository;
@@ -74,6 +76,9 @@ class ClawgicJudgeWorkerServiceIntegrationTest {
 
     @Autowired
     private ClawgicAgentRepository clawgicAgentRepository;
+
+    @Autowired
+    private ClawgicAgentEloRepository clawgicAgentEloRepository;
 
     @Autowired
     private ClawgicTournamentRepository clawgicTournamentRepository;
@@ -137,6 +142,20 @@ class ClawgicJudgeWorkerServiceIntegrationTest {
         assertEquals("mock-judge-primary", accepted.getJudgeKey());
         assertEquals(completedMatch.getWinnerAgentId(), accepted.getWinnerAgentId());
         assertNotNull(accepted.getResultJson());
+
+        ClawgicAgentElo agentOneElo = clawgicAgentEloRepository.findById(agent1Id).orElseThrow();
+        ClawgicAgentElo agentTwoElo = clawgicAgentEloRepository.findById(agent2Id).orElseThrow();
+        ClawgicAgentElo winnerElo = completedMatch.getWinnerAgentId().equals(agent1Id) ? agentOneElo : agentTwoElo;
+        ClawgicAgentElo loserElo = completedMatch.getWinnerAgentId().equals(agent1Id) ? agentTwoElo : agentOneElo;
+
+        assertEquals(1016, winnerElo.getCurrentElo());
+        assertEquals(984, loserElo.getCurrentElo());
+        assertEquals(1, winnerElo.getMatchesPlayed());
+        assertEquals(1, winnerElo.getMatchesWon());
+        assertEquals(0, winnerElo.getMatchesForfeited());
+        assertEquals(1, loserElo.getMatchesPlayed());
+        assertEquals(0, loserElo.getMatchesWon());
+        assertEquals(0, loserElo.getMatchesForfeited());
     }
 
     @Test
@@ -170,6 +189,13 @@ class ClawgicJudgeWorkerServiceIntegrationTest {
         assertEquals(List.of(1, 2), judgements.stream().map(ClawgicMatchJudgement::getAttempt).toList());
         assertTrue(judgements.stream().allMatch(judgement -> judgement.getStatus() == ClawgicMatchJudgementStatus.REJECTED));
         assertTrue(judgements.stream().allMatch(judgement -> judgement.getResultJson().has("error_code")));
+
+        ClawgicAgentElo agentOneElo = clawgicAgentEloRepository.findById(agent1Id).orElseThrow();
+        ClawgicAgentElo agentTwoElo = clawgicAgentEloRepository.findById(agent2Id).orElseThrow();
+        assertEquals(1000, agentOneElo.getCurrentElo());
+        assertEquals(1000, agentTwoElo.getCurrentElo());
+        assertEquals(0, agentOneElo.getMatchesPlayed());
+        assertEquals(0, agentTwoElo.getMatchesPlayed());
 
         Thread.sleep(400);
         assertEquals(
@@ -224,6 +250,16 @@ class ClawgicJudgeWorkerServiceIntegrationTest {
         agent.setCreatedAt(OffsetDateTime.now());
         agent.setUpdatedAt(OffsetDateTime.now());
         clawgicAgentRepository.saveAndFlush(agent);
+
+        ClawgicAgentElo agentElo = new ClawgicAgentElo();
+        agentElo.setAgentId(agent.getAgentId());
+        agentElo.setCurrentElo(1000);
+        agentElo.setMatchesPlayed(0);
+        agentElo.setMatchesWon(0);
+        agentElo.setMatchesForfeited(0);
+        agentElo.setLastUpdated(OffsetDateTime.now());
+        clawgicAgentEloRepository.saveAndFlush(agentElo);
+
         return agent.getAgentId();
     }
 

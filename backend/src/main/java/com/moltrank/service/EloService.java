@@ -13,10 +13,8 @@ import java.time.OffsetDateTime;
 /**
  * ELO rating update service.
  * Implements weighted ELO calculation for post rankings.
- *
  * Formula: E_X = 1 / (1 + 10^((R_Y - R_X) / 400))
  * K factor weighted by total stake and CuratorScore of voters
- *
  * PRD Reference: Section 4.7
  */
 @Service
@@ -50,16 +48,18 @@ public class EloService {
         int winnerElo = winner.getElo() != null ? winner.getElo() : INITIAL_ELO;
         int loserElo = loser.getElo() != null ? loser.getElo() : INITIAL_ELO;
 
-        // Calculate expected scores
-        double expectedWinner = calculateExpectedScore(winnerElo, loserElo);
-        double expectedLoser = calculateExpectedScore(loserElo, winnerElo);
-
         // Calculate weighted K factor
         double kFactor = calculateKFactor(totalStake, averageCuratorScore);
 
-        // Update ELO ratings (winner gets 1.0, loser gets 0.0)
-        int newWinnerElo = (int) Math.round(winnerElo + kFactor * (1.0 - expectedWinner));
-        int newLoserElo = (int) Math.round(loserElo + kFactor * (0.0 - expectedLoser));
+        EloRatingCalculator.RatingPair updatedRatings = EloRatingCalculator.calculateRatings(
+                winnerElo,
+                loserElo,
+                1.0d,
+                0.0d,
+                kFactor
+        );
+        int newWinnerElo = updatedRatings.playerOneRating();
+        int newLoserElo = updatedRatings.playerTwoRating();
 
         winner.setElo(newWinnerElo);
         winner.setUpdatedAt(OffsetDateTime.now());
@@ -93,16 +93,18 @@ public class EloService {
         int eloA = postA.getElo() != null ? postA.getElo() : INITIAL_ELO;
         int eloB = postB.getElo() != null ? postB.getElo() : INITIAL_ELO;
 
-        // Calculate expected scores
-        double expectedA = calculateExpectedScore(eloA, eloB);
-        double expectedB = calculateExpectedScore(eloB, eloA);
-
         // Calculate weighted K factor
         double kFactor = calculateKFactor(totalStake, averageCuratorScore);
 
-        // Update ELO ratings (both get 0.5 for a tie)
-        int newEloA = (int) Math.round(eloA + kFactor * (0.5 - expectedA));
-        int newEloB = (int) Math.round(eloB + kFactor * (0.5 - expectedB));
+        EloRatingCalculator.RatingPair updatedRatings = EloRatingCalculator.calculateRatings(
+                eloA,
+                eloB,
+                0.5d,
+                0.5d,
+                kFactor
+        );
+        int newEloA = updatedRatings.playerOneRating();
+        int newEloB = updatedRatings.playerTwoRating();
 
         postA.setElo(newEloA);
         postA.setUpdatedAt(OffsetDateTime.now());
@@ -116,18 +118,6 @@ public class EloService {
                 postAId, eloA, newEloA,
                 postBId, eloB, newEloB,
                 String.format("%.2f", kFactor));
-    }
-
-    /**
-     * Calculate expected score for a post given ELO ratings.
-     * Formula: E_X = 1 / (1 + 10^((R_Y - R_X) / 400))
-     *
-     * @param ratingX ELO rating of post X
-     * @param ratingY ELO rating of post Y
-     * @return Expected score (0.0 to 1.0)
-     */
-    private double calculateExpectedScore(int ratingX, int ratingY) {
-        return 1.0 / (1.0 + Math.pow(10.0, (ratingY - ratingX) / 400.0));
     }
 
     /**

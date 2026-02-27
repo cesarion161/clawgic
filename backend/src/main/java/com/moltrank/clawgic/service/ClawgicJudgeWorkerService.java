@@ -47,6 +47,7 @@ public class ClawgicJudgeWorkerService {
     private final ClawgicTournamentRepository clawgicTournamentRepository;
     private final ClawgicMatchJudgementRepository clawgicMatchJudgementRepository;
     private final ClawgicJudgeProviderGateway clawgicJudgeProviderGateway;
+    private final ClawgicAgentEloService clawgicAgentEloService;
     private final ClawgicJudgeProperties clawgicJudgeProperties;
     private final TransactionTemplate transactionTemplate;
 
@@ -206,6 +207,12 @@ public class ClawgicJudgeWorkerService {
             );
         }
 
+        clawgicAgentEloService.applyJudgedMatchResult(
+                match.getMatchId(),
+                match.getAgent1Id(),
+                match.getAgent2Id(),
+                selectedVerdict.getWinnerAgentId()
+        );
         match.setWinnerAgentId(selectedVerdict.getWinnerAgentId());
         match.setJudgeResultJson(selectedVerdict.getResultJson());
         match.setStatus(ClawgicMatchStatus.COMPLETED);
