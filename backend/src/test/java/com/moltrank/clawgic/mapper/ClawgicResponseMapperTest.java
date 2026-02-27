@@ -3,6 +3,7 @@ package com.moltrank.clawgic.mapper;
 import com.moltrank.clawgic.dto.ClawgicAgentResponses;
 import com.moltrank.clawgic.model.ClawgicAgent;
 import com.moltrank.clawgic.model.ClawgicAgentElo;
+import com.moltrank.clawgic.model.ClawgicProviderType;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.RecordComponent;
@@ -33,6 +34,8 @@ class ClawgicResponseMapperTest {
         agent.setSkillsMarkdown("- rebuttal\n- synthesis");
         agent.setPersona("Analytical and concise");
         agent.setAgentsMdSource("# AGENTS.md\n...");
+        agent.setProviderType(ClawgicProviderType.OPENAI);
+        agent.setProviderKeyRef("team/openai/primary");
         agent.setApiKeyEncrypted("enc:secret");
         agent.setApiKeyEncryptionKeyId("kms-key-1");
         agent.setCreatedAt(createdAt);
@@ -52,10 +55,14 @@ class ClawgicResponseMapperTest {
         assertEquals(agentId, summary.agentId());
         assertEquals("Mapper Test Agent", summary.name());
         assertEquals("0xabc123", summary.walletAddress());
+        assertEquals("OPENAI", summary.providerType());
+        assertEquals("team/openai/primary", summary.providerKeyRef());
         assertEquals(createdAt, summary.createdAt());
 
         assertEquals(agentId, detail.agentId());
         assertEquals("Debate with precise logic.", detail.systemPrompt());
+        assertEquals("OPENAI", detail.providerType());
+        assertEquals("team/openai/primary", detail.providerKeyRef());
         assertTrue(detail.apiKeyConfigured());
         assertNotNull(detail.elo());
         assertEquals(1088, detail.elo().currentElo());

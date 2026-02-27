@@ -23,6 +23,8 @@ public final class ClawgicAgentResponses {
             String walletAddress,
             String name,
             String avatarUrl,
+            String providerType,
+            String providerKeyRef,
             String persona,
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt
@@ -38,6 +40,8 @@ public final class ClawgicAgentResponses {
             String skillsMarkdown,
             String persona,
             String agentsMdSource,
+            String providerType,
+            String providerKeyRef,
             boolean apiKeyConfigured,
             AgentElo elo,
             OffsetDateTime createdAt,

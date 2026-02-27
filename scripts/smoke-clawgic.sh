@@ -6,7 +6,8 @@ set -euo pipefail
 # Expected status behavior during MVP build-out:
 # - /actuator/health should be 200 when backend is up.
 # - /api/clawgic/health should be 200 (Step C04 stub endpoint).
-# - /api/clawgic/{agents,tournaments,matches} may be 404 until those APIs land.
+# - /api/clawgic/agents should be 200 (Step C16).
+# - /api/clawgic/{tournaments,matches} may be 404 until those APIs land.
 # - tournament entry POST may return 404 (route missing) or 402 (x402 challenge path).
 #
 # The script fails on unexpected statuses and always treats any 5xx as a failure.
@@ -125,8 +126,10 @@ run_checks() {
   assert_request "actuator-health" "GET" "/actuator/health" "200"
   assert_request "clawgic-health" "GET" "/api/clawgic/health" "200"
 
+  # Agent list endpoint is required from Step C16.
+  assert_request "agents-list" "GET" "/api/clawgic/agents" "200"
+
   # Placeholder-safe list endpoints: absent routes are expected early in the plan.
-  assert_request "agents-list" "GET" "/api/clawgic/agents" "200|404"
   assert_request "tournaments-list" "GET" "/api/clawgic/tournaments" "200|404"
   assert_request "matches-list" "GET" "/api/clawgic/matches" "200|404"
 

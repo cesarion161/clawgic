@@ -50,6 +50,8 @@ public class ClawgicResponseMapper {
                 agent.getWalletAddress(),
                 agent.getName(),
                 agent.getAvatarUrl(),
+                agent.getProviderType() != null ? agent.getProviderType().name() : null,
+                agent.getProviderKeyRef(),
                 agent.getPersona(),
                 agent.getCreatedAt(),
                 agent.getUpdatedAt()
@@ -76,6 +78,8 @@ public class ClawgicResponseMapper {
                 agent.getSkillsMarkdown(),
                 agent.getPersona(),
                 agent.getAgentsMdSource(),
+                agent.getProviderType() != null ? agent.getProviderType().name() : null,
+                agent.getProviderKeyRef(),
                 StringUtils.hasText(agent.getApiKeyEncrypted()),
                 toAgentEloResponse(elo),
                 agent.getCreatedAt(),

@@ -10,5 +10,5 @@ import java.util.UUID;
 @Repository
 public interface ClawgicAgentRepository extends JpaRepository<ClawgicAgent, UUID> {
     List<ClawgicAgent> findByWalletAddress(String walletAddress);
+    List<ClawgicAgent> findByWalletAddressOrderByCreatedAtDesc(String walletAddress);
 }
-
