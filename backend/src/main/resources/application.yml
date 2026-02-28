@@ -1,10 +1,10 @@
 spring:
   application:
-    name: moltrank-backend
+    name: clawgic-backend
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/moltrank
-    username: moltrank
+    url: jdbc:postgresql://localhost:5432/clawgic
+    username: clawgic
     password: ${DB_PASSWORD:changeme}
     driver-class-name: org.postgresql.Driver
 
@@ -44,18 +44,18 @@ management:
 
 logging:
   level:
-    com.moltrank: DEBUG
+    com.clawgic: DEBUG
     org.springframework: INFO
 
 # Clawgic pivot feature flags and runtime defaults (Step C02)
-# These defaults keep the existing MoltRank demo path intact while enabling
+# These defaults keep the existing legacy demo path intact while enabling
 # incremental Clawgic implementation behind explicit flags.
 clawgic:
   enabled: true
   mock-provider: true
   mock-judge: true
-  legacy-molt-rank-ui-enabled: true
-  legacy-molt-rank-api-enabled: true
+  legacy-ui-enabled: true
+  legacy-api-enabled: true
   tournament:
     mvp-bracket-size: 4
     default-entry-window-minutes: 60
@@ -94,6 +94,35 @@ clawgic:
     keys:
       local-dev-v1: ${CLAWGIC_AGENT_API_KEY_ENCRYPTION_KEY_LOCAL_DEV_V1_BASE64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
     max-plaintext-length: 4096
+  pairs-per-subscriber: 5  # K value for demand-gated pair generation formula
+  curation:
+    target-reveals-per-pair: 3
+    expected-reveals-per-curator: 6
+    max-pairs-per-curator-per-round: 20
+  ingestion:
+    enabled: false
+    run-on-startup: false
+    fetch-limit: 100
+    initial-delay-ms: 60000
+    interval-ms: 300000
+    # Legacy social feed ingestion endpoint (optional):
+    # api-url: https://api.moltbook.com
+  reveal:
+    grace-period-minutes: 30
+    max-retries: 3
+    retry-delay-seconds: 5
+    penalty-enforcement-enabled: true
+    penalty-initial-delay-ms: 60000
+    penalty-interval-ms: 60000
+  commit-security:
+    max-signature-age-seconds: 300
+    max-future-skew-seconds: 60
+    replay-window-seconds: 900
+    allow-legacy-unsigned-commits: false
+    allow-legacy-reveal-decode: true
+    active-storage-key-id: v1
+    storage-keys:
+      v1: ${CLAWGIC_COMMIT_STORAGE_KEY_V1_BASE64:bW9sdHJhbmstY29tbWl0LWtleS12MS0zMi1ieXRlcyE=}
 
 x402:
   enabled: false
@@ -113,34 +142,3 @@ solana:
   rpc:
     url: https://api.devnet.solana.com
   program-id: ChLerptVUKPq814C4L4DHroiYBGJHHWCTRxbkGCa9non
-
-moltrank:
-  pairs-per-subscriber: 5  # K value for demand-gated pair generation formula
-  curation:
-    target-reveals-per-pair: 3
-    expected-reveals-per-curator: 6
-    max-pairs-per-curator-per-round: 20
-  ingestion:
-    enabled: false
-    run-on-startup: false
-    fetch-limit: 100
-    initial-delay-ms: 60000
-    interval-ms: 300000
-  reveal:
-    grace-period-minutes: 30
-    max-retries: 3
-    retry-delay-seconds: 5
-    penalty-enforcement-enabled: true
-    penalty-initial-delay-ms: 60000
-    penalty-interval-ms: 60000
-  commit-security:
-    max-signature-age-seconds: 300
-    max-future-skew-seconds: 60
-    replay-window-seconds: 900
-    allow-legacy-unsigned-commits: false
-    allow-legacy-reveal-decode: true
-    active-storage-key-id: v1
-    storage-keys:
-      v1: ${MOLTRANK_COMMIT_STORAGE_KEY_V1_BASE64:bW9sdHJhbmstY29tbWl0LWtleS12MS0zMi1ieXRlcyE=}
-  moltbook:
-    # api-url: https://api.moltbook.com  # Uncomment when real Moltbook API is available

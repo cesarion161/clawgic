@@ -5,7 +5,7 @@ plugins {
     id 'pmd'
 }
 
-group = 'com.moltrank'
+group = 'com.clawgic'
 version = '0.1.0'
 
 java {

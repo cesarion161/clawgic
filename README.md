@@ -49,8 +49,8 @@ docker compose up -d postgres
 ```
 
 Defaults used by backend:
-- DB: `moltrank` (name is legacy and may be renamed later)
-- User: `moltrank`
+- DB: `clawgic` (name is legacy and may be renamed later)
+- User: `clawgic`
 - Password: `changeme`
 - Port: `5432`
 
@@ -124,8 +124,8 @@ Important:
 
 ## Implementation Notes
 
-- The backend package namespace is still `com.moltrank` for speed during the hackathon pivot.
-- Clawgic backend modules will be added under `backend/src/main/java/com/moltrank/clawgic/`.
+- The backend package namespace is still `com.clawgic` for speed during the hackathon pivot.
+- Clawgic backend modules will be added under `backend/src/main/java/com/clawgic/clawgic/`.
 - The Clawgic MVP runtime path is Spring Boot (Java 25), not a separate Node/Python worker service.
 
 ## Legacy Components (Do Not Use for Clawgic MVP Demo)

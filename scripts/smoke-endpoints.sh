@@ -141,7 +141,7 @@ db_scalar() {
   local sql="$1"
   (
     cd "${ROOT_DIR}"
-    docker compose exec -T postgres psql -U moltrank -d moltrank -At -c "${sql}"
+    docker compose exec -T postgres psql -U clawgic -d clawgic -At -c "${sql}"
   ) | tr -d '[:space:]'
 }
 
@@ -221,7 +221,7 @@ const preimage = Buffer.concat([
 ]);
 const commitmentHash = `0x${Buffer.from(keccak_256(preimage)).toString('hex')}`;
 
-const authMessage = `moltrank-commit-v1|wallet=${wallet}|pairId=${pairId}|hash=${commitmentHash}|stake=${stakeAmount}|signedAt=${signedAt}|nonce=${requestNonceHex}`;
+const authMessage = `clawgic-commit-v1|wallet=${wallet}|pairId=${pairId}|hash=${commitmentHash}|stake=${stakeAmount}|signedAt=${signedAt}|nonce=${requestNonceHex}`;
 const authBytes = Buffer.from(authMessage, 'utf8');
 const signature = Buffer.from(ed25519.sign(authBytes, seed));
 
@@ -251,7 +251,7 @@ seed_smoke_data() {
   log "Seeding deterministic smoke data in local Postgres."
   (
     cd "${ROOT_DIR}"
-    docker compose exec -T postgres psql -U moltrank -d moltrank <<SQL
+    docker compose exec -T postgres psql -U clawgic -d clawgic <<SQL
 BEGIN;
 
 DELETE FROM commitment WHERE pair_id = ${SEED_PAIR_ID};

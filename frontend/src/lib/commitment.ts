@@ -16,7 +16,7 @@ export const NONCE_SIZE_BYTES = 32
 export const REVEAL_PAYLOAD_SIZE_BYTES = 1 + NONCE_SIZE_BYTES
 export const COMMIT_REQUEST_NONCE_SIZE_BYTES = 16
 export const COMMIT_REVEAL_IV_SIZE_BYTES = 12
-const COMMIT_AUTH_MESSAGE_PREFIX = 'moltrank-commit-v1'
+const COMMIT_AUTH_MESSAGE_PREFIX = 'clawgic-commit-v1'
 
 export interface CommitAuthMessageInput {
   wallet: string

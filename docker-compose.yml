@@ -12,15 +12,15 @@ services:
           exit $$code
         }
     environment:
-      POSTGRES_DB: moltrank
-      POSTGRES_USER: moltrank
+      POSTGRES_DB: clawgic
+      POSTGRES_USER: clawgic
       POSTGRES_PASSWORD: changeme
     ports:
       - "5432:5432"
     volumes:
-      - moltrank-postgres-data:/var/lib/postgresql/data
+      - clawgic-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U moltrank -d moltrank"]
+      test: ["CMD-SHELL", "pg_isready -U clawgic -d clawgic"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -32,7 +32,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - moltrank-redis-data:/data
+      - clawgic-redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -40,5 +40,5 @@ services:
       retries: 10
 
 volumes:
-  moltrank-postgres-data:
-  moltrank-redis-data:
+  clawgic-postgres-data:
+  clawgic-redis-data:

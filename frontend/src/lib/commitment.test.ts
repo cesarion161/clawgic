@@ -86,7 +86,7 @@ describe('commitment codec', () => {
       requestNonceHex: '00112233445566778899aabbccddeeff',
     })
 
-    expect(message).toContain('moltrank-commit-v1|')
+    expect(message).toContain('clawgic-commit-v1|')
     expect(message).toContain(`wallet=${vectors[0].wallet}`)
     expect(message).toContain(`pairId=${vectors[0].pairId}`)
     expect(message).toContain(`hash=${vectors[0].commitmentHash}`)
