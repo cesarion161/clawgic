@@ -12,8 +12,8 @@
     --popover-foreground: 224 28% 14%;
     --primary: 329 86% 66%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 132 48% 55%;
-    --secondary-foreground: 148 42% 16%;
+    --secondary: 220 24% 93%;
+    --secondary-foreground: 224 24% 22%;
     --muted: 220 26% 93%;
     --muted-foreground: 224 16% 36%;
     --accent: 330 75% 95%;
@@ -35,7 +35,7 @@
     --popover-foreground: 210 40% 98%;
     --primary: 329 86% 66%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 132 48% 55%;
+    --secondary: 225 23% 22%;
     --secondary-foreground: 210 40% 98%;
     --muted: 225 24% 18%;
     --muted-foreground: 216 21% 72%;
@@ -64,7 +64,7 @@
     min-height: 100vh;
     background-image:
       radial-gradient(circle at 10% -10%, rgb(243 96 169 / 18%), transparent 42%),
-      radial-gradient(circle at 92% 6%, rgb(83 196 106 / 14%), transparent 36%),
+      radial-gradient(circle at 92% 6%, rgb(243 96 169 / 12%), transparent 36%),
       linear-gradient(180deg, #ffffff 0%, #f8f9ff 52%, #f6f5fb 100%);
   }
 
@@ -89,7 +89,7 @@
 
 @layer components {
   .clawgic-surface {
-    @apply rounded-3xl border border-border/80 bg-white/85 shadow-[0_24px_60px_-34px_rgba(22,27,43,0.35)] backdrop-blur;
+    @apply rounded-3xl border border-border/85 bg-white/95 shadow-[0_24px_60px_-34px_rgba(22,27,43,0.35)] backdrop-blur;
   }
 
   .clawgic-card {
@@ -129,7 +129,7 @@
 
   .clawgic-primary-btn {
     @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200;
-    background-image: linear-gradient(135deg, rgb(243 96 169) 0%, rgb(221 85 183) 48%, rgb(83 196 106) 100%);
+    background-image: linear-gradient(135deg, rgb(243 96 169) 0%, rgb(228 78 158) 52%, rgb(207 59 148) 100%);
     box-shadow: 0 10px 24px -14px rgb(243 96 169 / 80%);
   }
 
@@ -157,9 +157,26 @@
     transform: translateY(-1px);
   }
 
-  .clawgic-logo-mark {
-    background-image: linear-gradient(145deg, rgb(243 96 169), rgb(184 77 200) 60%, rgb(83 196 106));
-    box-shadow: 0 12px 24px -15px rgb(243 96 169 / 80%);
+  .clawgic-hero-parallax {
+    pointer-events: none;
+    position: absolute;
+    inset: -20% -12% -20% -12%;
+    z-index: 0;
+    opacity: 0.86;
+    filter: saturate(1.05) contrast(1.03);
+    transform: translate3d(0, var(--parallax-shift, 0px), 0);
+    transition: transform 120ms linear;
+    will-change: transform;
+  }
+
+  .clawgic-hero-parallax-panel {
+    opacity: 0.88;
+  }
+
+  .clawgic-hero-parallax-image {
+    object-fit: cover;
+    object-position: center 34%;
+    transform: scale(1.03);
   }
 
   .clawgic-nav-blur {
@@ -167,29 +184,47 @@
     backdrop-filter: blur(14px);
   }
 
-  details > summary::marker,
-  details > summary::-webkit-details-marker {
-    display: none;
-    content: '';
-  }
-
-  .wallet-adapter-button {
+  .clawgic-nav-blur .wallet-adapter-button,
+  .clawgic-nav-blur .wallet-adapter-button-trigger {
     border-radius: 0.75rem !important;
-    background-image: linear-gradient(135deg, rgb(243 96 169), rgb(200 85 190), rgb(83 196 106)) !important;
-    color: white !important;
+    height: 2.5rem !important;
+    padding: 0 1rem !important;
+    border: 0 !important;
+    background: hsl(var(--primary)) !important;
+    background-image: none !important;
+    color: hsl(var(--primary-foreground)) !important;
+    font-size: 0.875rem !important;
     font-weight: 600 !important;
-    transition: transform 180ms ease, box-shadow 180ms ease !important;
+    line-height: 1 !important;
+    transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease !important;
     box-shadow: 0 12px 24px -18px rgb(243 96 169 / 90%) !important;
   }
 
-  .wallet-adapter-button:not([disabled]):hover {
+  .clawgic-nav-blur .wallet-adapter-button:not([disabled]):hover,
+  .clawgic-nav-blur .wallet-adapter-button-trigger:not([disabled]):hover {
+    background: rgb(228 78 158) !important;
     transform: translateY(-1px);
     box-shadow: 0 18px 30px -18px rgb(243 96 169 / 90%) !important;
   }
 
-  .wallet-adapter-button:focus-visible {
+  .clawgic-nav-blur .wallet-adapter-button:focus-visible,
+  .clawgic-nav-blur .wallet-adapter-button-trigger:focus-visible {
     outline: 2px solid rgb(243 96 169 / 70%);
     outline-offset: 3px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .clawgic-hero-parallax {
+    inset: -16% -10% -16% -10%;
+    opacity: 0.82;
+  }
+}
+
+@media (max-width: 767px) {
+  .clawgic-hero-parallax {
+    inset: -14% -9% -14% -9%;
+    opacity: 0.78;
   }
 }
 

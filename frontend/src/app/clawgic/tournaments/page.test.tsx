@@ -107,7 +107,7 @@ describe('ClawgicTournamentLobbyPage', () => {
     expect(
       screen.getByRole('combobox', { name: /Select agent for Debate on deterministic mocks/i })
     ).toHaveClass('clawgic-select')
-    expect(screen.getByText('Clawgic MVP')).toHaveClass('clawgic-badge')
+    expect(screen.getByText('Clawgic')).toHaveClass('clawgic-badge')
   })
 
   it('renders error state when lobby fetch fails', async () => {

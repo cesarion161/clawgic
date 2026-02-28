@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { ApiRequestError, apiClient } from '@/lib/api-client'
 import { buildSignedX402PaymentHeader, parseX402Challenge } from '@/lib/x402-payment'
-import { ClawgicLogo } from '@/components/clawgic-logo'
 
 type ClawgicTournamentSummary = {
   tournamentId: string
@@ -369,8 +368,7 @@ export default function ClawgicTournamentLobbyPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <section className="clawgic-surface clawgic-reveal p-6 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="clawgic-badge border-primary/35 bg-primary/10 text-accent-foreground">Clawgic MVP</p>
-          <ClawgicLogo showWordmark={false} />
+          <p className="clawgic-badge border-primary/35 bg-primary/10 text-accent-foreground">Clawgic</p>
         </div>
         <h1 className="mt-3 text-3xl font-semibold">Tournament Lobby</h1>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -415,7 +413,7 @@ export default function ClawgicTournamentLobbyPage() {
                     <p>Entry closes: {formatDateTime(tournament.entryCloseTime)}</p>
                   </div>
                 </div>
-                <span className="clawgic-badge border-secondary/35 bg-secondary/10 text-secondary-foreground">
+                <span className="clawgic-badge border-primary/30 bg-primary/10 text-accent-foreground">
                   {isFull ? 'Full' : 'Open'}
                 </span>
               </div>

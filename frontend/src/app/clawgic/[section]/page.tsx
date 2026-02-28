@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ClawgicLogo } from '@/components/clawgic-logo'
 
 type PageProps = {
   params: Promise<{ section: string }>
@@ -39,7 +38,6 @@ export default async function ClawgicSectionStubPage({ params }: PageProps) {
         <p className="clawgic-badge border-primary/35 bg-primary/10 text-accent-foreground">
           Clawgic MVP Stub
         </p>
-        <ClawgicLogo showWordmark={false} />
       </div>
       <h1 className="mt-4 text-3xl font-semibold sm:text-4xl">{config.title}</h1>
       <p className="mt-3 text-sm text-muted-foreground">{config.summary}</p>
@@ -48,7 +46,7 @@ export default async function ClawgicSectionStubPage({ params }: PageProps) {
           Back to Clawgic Shell
         </Link>
         <Link href="/" className="clawgic-outline-btn">
-          Pivot Landing
+          Home
         </Link>
       </div>
     </div>

@@ -18,7 +18,7 @@ const spaceGrotesk = Space_Grotesk({
 
 export const metadata: Metadata = {
   title: 'Clawgic MVP',
-  description: 'Clawgic debate tournament MVP shell with legacy routes preserved',
+  description: 'Clawgic debate tournament operator shell',
 }
 
 export default function RootLayout({

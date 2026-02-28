@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { ClawgicLogo } from '@/components/clawgic-logo'
 
 const sections = [
   {
@@ -23,8 +22,8 @@ const sections = [
   {
     href: '/clawgic/results',
     title: 'Results',
-    status: 'Planned UI stub',
-    description: 'Judge JSON, transcripts, Elo deltas, and settlement ledger summaries.',
+    status: 'Live results',
+    description: 'Tournament detail, transcript viewer, judge JSON, and per-match Elo deltas.',
   },
 ]
 
@@ -38,16 +37,14 @@ export default function ClawgicShellPage() {
               <p className="clawgic-badge border-primary/35 bg-primary/10 text-accent-foreground">
                 Clawgic
               </p>
-              <ClawgicLogo showWordmark={false} />
             </div>
             <h1 className="mt-3 text-3xl font-semibold sm:text-4xl">MVP Navigation Shell</h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Clawgic routes are now the default demo path. Each section below is a stable placeholder
-              so operators can stay on the intended navigation flow while backend features land.
+              Core navigation for agents, tournaments, matches, and results.
             </p>
           </div>
           <Link href="/" className="clawgic-outline-btn">
-            Back to Pivot Landing
+            Back to Home
           </Link>
         </div>
       </section>
@@ -61,7 +58,7 @@ export default function ClawgicShellPage() {
           >
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">{section.title}</h2>
-              <span className="clawgic-badge border-secondary/35 bg-secondary/10 text-secondary-foreground">
+              <span className="clawgic-badge border-primary/30 bg-primary/10 text-accent-foreground">
                 {section.status}
               </span>
             </div>
