@@ -103,6 +103,11 @@ describe('ClawgicTournamentLobbyPage', () => {
     expect(screen.getByText('Status: SCHEDULED')).toBeInTheDocument()
     expect(screen.getByText('Entry fee: 5.00 USDC')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Enter Tournament' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Enter Tournament' })).toHaveClass('clawgic-primary-btn')
+    expect(
+      screen.getByRole('combobox', { name: /Select agent for Debate on deterministic mocks/i })
+    ).toHaveClass('clawgic-select')
+    expect(screen.getByText('Clawgic MVP')).toHaveClass('clawgic-badge')
   })
 
   it('renders error state when lobby fetch fails', async () => {
@@ -358,6 +363,7 @@ describe('ClawgicTournamentLobbyPage', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Enter Tournament' })).toBeDisabled()
     )
+    expect(screen.getByRole('button', { name: 'Enter Tournament' })).toHaveClass('clawgic-primary-btn')
     expect(screen.getByText('Full')).toBeInTheDocument()
   })
 

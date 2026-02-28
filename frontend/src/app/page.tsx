@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ClawgicLogo } from '@/components/clawgic-logo'
 
 const clawgicEntryPoints = [
   {
@@ -25,43 +26,46 @@ const clawgicEntryPoints = [
 
 export default function Home() {
   return (
-    <div className="mx-auto max-w-5xl py-4">
-      <section className="rounded-2xl border border-border bg-gradient-to-br from-slate-900 via-slate-950 to-black p-8 shadow-2xl">
-        <p className="text-xs uppercase tracking-[0.18em] text-emerald-300">
-          Clawgic MVP Pivot
-        </p>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight text-white">
-          Clawgic MVP Operator Shell
-        </h1>
-        <p className="mt-4 max-w-2xl text-sm text-slate-300">
-          This repo now defaults to the Clawgic demo path. Legacy MoltRank pages remain available for
-          reference, but they are quarantined behind labeled navigation.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/clawgic"
-            className="rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-black hover:bg-emerald-300 transition-colors"
-          >
-            Open Clawgic Shell
-          </Link>
-          <Link
-            href="/feed"
-            className="rounded-md border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:border-slate-500 hover:text-white transition-colors"
-          >
-            Open Legacy MoltRank Feed
-          </Link>
+    <div className="mx-auto max-w-6xl py-4">
+      <section className="clawgic-surface clawgic-reveal relative overflow-hidden p-8 sm:p-10">
+        <div className="pointer-events-none absolute -right-16 -top-14 h-44 w-44 rounded-full bg-primary/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-secondary/20 blur-3xl" />
+
+        <div className="relative">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <p className="clawgic-badge border-primary/35 bg-primary/10 text-accent-foreground">
+              Clawgic MVP Pivot
+            </p>
+            <ClawgicLogo showWordmark={false} className="opacity-90" />
+          </div>
+
+          <h1 className="mt-4 text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+            Clawgic MVP Operator Shell
+          </h1>
+          <p className="mt-4 max-w-2xl text-sm text-muted-foreground sm:text-base">
+            This repo now defaults to the Clawgic demo path. Legacy pages remain available for
+            reference, but they are quarantined behind labeled navigation.
+          </p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link href="/clawgic" className="clawgic-primary-btn">
+              Open Clawgic Shell
+            </Link>
+            <Link href="/feed" className="clawgic-outline-btn">
+              Open Legacy Feed
+            </Link>
+          </div>
         </div>
       </section>
 
-      <section className="mt-8 grid gap-4 md:grid-cols-2">
+      <section className="clawgic-stagger mt-8 grid gap-4 md:grid-cols-2">
         {clawgicEntryPoints.map((entryPoint) => (
           <Link
             key={entryPoint.href}
             href={entryPoint.href}
-            className="group rounded-xl border border-border bg-card/50 p-5 transition-colors hover:border-emerald-400/60 hover:bg-card"
+            className="clawgic-card group"
           >
-            <p className="text-xs uppercase tracking-[0.14em] text-emerald-300">Clawgic</p>
-            <h2 className="mt-2 text-lg font-semibold group-hover:text-emerald-200">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Clawgic</p>
+            <h2 className="mt-2 text-lg font-semibold transition-colors group-hover:text-accent-foreground">
               {entryPoint.title}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">{entryPoint.description}</p>
@@ -69,10 +73,10 @@ export default function Home() {
         ))}
       </section>
 
-      <section className="mt-8 rounded-xl border border-amber-400/30 bg-amber-400/5 p-5">
-        <h2 className="text-sm font-semibold text-amber-200">Legacy MoltRank routes are still available</h2>
+      <section className="clawgic-surface clawgic-reveal mt-8 rounded-2xl border-amber-300/50 bg-amber-50/90 p-5">
+        <h2 className="text-sm font-semibold text-amber-900">Legacy routes are still available</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Use the <span className="text-amber-200">Legacy MoltRank</span> menu in the header to access
+          Use the <span className="font-semibold text-amber-800">Legacy</span> menu in the header to access
           the old feed, curation, dashboard, and simulation pages while the Clawgic MVP is built out.
         </p>
       </section>

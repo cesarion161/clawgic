@@ -12,7 +12,7 @@ describe('Pivot landing page', () => {
       'href',
       '/clawgic'
     )
-    expect(screen.getByRole('link', { name: 'Open Legacy MoltRank Feed' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open Legacy Feed' })).toHaveAttribute(
       'href',
       '/feed'
     )

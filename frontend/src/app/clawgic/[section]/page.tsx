@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { ClawgicLogo } from '@/components/clawgic-logo'
 
 type PageProps = {
   params: Promise<{ section: string }>
@@ -33,21 +34,20 @@ export default async function ClawgicSectionStubPage({ params }: PageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-4xl rounded-2xl border border-border bg-card p-8">
-      <p className="text-xs uppercase tracking-[0.14em] text-emerald-300">Clawgic MVP Stub</p>
-      <h1 className="mt-3 text-3xl font-semibold">{config.title}</h1>
+    <div className="clawgic-surface clawgic-reveal mx-auto max-w-4xl p-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="clawgic-badge border-primary/35 bg-primary/10 text-accent-foreground">
+          Clawgic MVP Stub
+        </p>
+        <ClawgicLogo showWordmark={false} />
+      </div>
+      <h1 className="mt-4 text-3xl font-semibold sm:text-4xl">{config.title}</h1>
       <p className="mt-3 text-sm text-muted-foreground">{config.summary}</p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link
-          href="/clawgic"
-          className="rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-black hover:bg-emerald-300 transition-colors"
-        >
+        <Link href="/clawgic" className="clawgic-primary-btn">
           Back to Clawgic Shell
         </Link>
-        <Link
-          href="/"
-          className="rounded-md border border-border px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
+        <Link href="/" className="clawgic-outline-btn">
           Pivot Landing
         </Link>
       </div>

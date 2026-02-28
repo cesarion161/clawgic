@@ -6,7 +6,7 @@ import { SubscriptionBanner } from '@/components/subscription-banner'
 import { useFeed } from '@/hooks/use-feed'
 import type { SubscriptionType } from '@/lib/types'
 
-// Legacy MoltRank feed preserved during the Clawgic pivot.
+// Legacy feed preserved during the Clawgic pivot.
 const GENERAL_MARKET_ID = 1
 
 export default function LegacyFeedPage() {
@@ -30,7 +30,7 @@ export default function LegacyFeedPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <p className="text-xs uppercase tracking-[0.14em] text-amber-300">Legacy MoltRank</p>
+        <p className="text-xs uppercase tracking-[0.14em] text-amber-300">Legacy</p>
         <h1 className="text-4xl font-bold mb-2">Curated Feed</h1>
         <p className="text-muted-foreground">Quality content ranked by ELO rating</p>
       </div>

@@ -12,12 +12,15 @@ vi.mock('./link-twitter', () => ({
 
 describe('Navbar', () => {
   it('shows Clawgic-first navigation and labels legacy routes', () => {
-    render(<Navbar />)
+    const { container } = render(<Navbar />)
 
     expect(screen.getByRole('link', { name: 'Clawgic' })).toHaveAttribute('href', '/')
+    expect(screen.getByTestId('clawgic-logo-mark')).toBeInTheDocument()
+    expect(screen.getByText('MVP')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Clawgic Home' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'Shell' })).toHaveAttribute('href', '/clawgic')
-    expect(screen.getByText('Legacy MoltRank')).toBeInTheDocument()
+    expect(screen.getByText('Legacy', { selector: 'summary' })).toBeInTheDocument()
+    expect(container.querySelector('nav')).toHaveClass('clawgic-nav-blur')
 
     expect(screen.getByRole('link', { name: /Feed\s*Legacy/i, hidden: true })).toHaveAttribute(
       'href',

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { ApiRequestError, apiClient } from '@/lib/api-client'
 import { buildSignedX402PaymentHeader, parseX402Challenge } from '@/lib/x402-payment'
+import { ClawgicLogo } from '@/components/clawgic-logo'
 
 type ClawgicTournamentSummary = {
   tournamentId: string
@@ -336,7 +337,7 @@ export default function ClawgicTournamentLobbyPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-5xl rounded-2xl border border-border bg-card p-8">
+      <div className="clawgic-surface mx-auto max-w-6xl p-8">
         <h1 className="text-3xl font-semibold">Tournament Lobby</h1>
         <p className="mt-3 text-sm text-muted-foreground">Loading tournament lobby...</p>
       </div>
@@ -345,9 +346,9 @@ export default function ClawgicTournamentLobbyPage() {
 
   if (errorMessage) {
     return (
-      <div className="mx-auto max-w-5xl rounded-2xl border border-red-500/30 bg-red-500/5 p-8">
+      <div className="mx-auto max-w-6xl rounded-3xl border border-red-400/30 bg-red-50 p-8">
         <h1 className="text-3xl font-semibold">Tournament Lobby</h1>
-        <p className="mt-3 text-sm text-red-200">Failed to load tournament lobby.</p>
+        <p className="mt-3 text-sm text-red-800">Failed to load tournament lobby.</p>
         <p className="mt-2 text-sm text-muted-foreground">{errorMessage}</p>
       </div>
     )
@@ -355,7 +356,7 @@ export default function ClawgicTournamentLobbyPage() {
 
   if (tournaments.length === 0) {
     return (
-      <div className="mx-auto max-w-5xl rounded-2xl border border-border bg-card p-8">
+      <div className="clawgic-surface mx-auto max-w-6xl p-8">
         <h1 className="text-3xl font-semibold">Tournament Lobby</h1>
         <p className="mt-3 text-sm text-muted-foreground">
           No upcoming tournaments yet. Create one from the backend admin API and refresh.
@@ -365,18 +366,21 @@ export default function ClawgicTournamentLobbyPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <section className="rounded-2xl border border-border bg-card p-6">
-        <p className="text-xs uppercase tracking-[0.14em] text-emerald-300">Clawgic MVP</p>
-        <h1 className="mt-2 text-3xl font-semibold">Tournament Lobby</h1>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <section className="clawgic-surface clawgic-reveal p-6 sm:p-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="clawgic-badge border-primary/35 bg-primary/10 text-accent-foreground">Clawgic MVP</p>
+          <ClawgicLogo showWordmark={false} />
+        </div>
+        <h1 className="mt-3 text-3xl font-semibold">Tournament Lobby</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Entry supports local dev-bypass and live <code>402 -&gt; X-PAYMENT</code> retry when{' '}
           <code>x402.enabled=true</code>.
         </p>
         {agents.length === 0 ? (
-          <p className="mt-4 text-sm text-amber-200">
+          <p className="mt-4 text-sm text-amber-800">
             No agents found. Create one first at{' '}
-            <Link href="/clawgic/agents" className="underline decoration-amber-300/50">
+            <Link href="/clawgic/agents" className="font-semibold underline decoration-amber-500/50">
               /clawgic/agents
             </Link>
             .
@@ -384,7 +388,7 @@ export default function ClawgicTournamentLobbyPage() {
         ) : null}
       </section>
 
-      <section className="grid gap-4">
+      <section className="clawgic-stagger grid gap-4">
         {tournaments.map((tournament) => {
           const tournamentId = tournament.tournamentId
           const isSubmitting = submittingTournamentId === tournamentId
@@ -396,7 +400,7 @@ export default function ClawgicTournamentLobbyPage() {
           return (
             <article
               key={tournamentId}
-              className="rounded-xl border border-border bg-card/60 p-5"
+              className="clawgic-card"
               aria-label={`Tournament ${tournament.topic}`}
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -411,7 +415,7 @@ export default function ClawgicTournamentLobbyPage() {
                     <p>Entry closes: {formatDateTime(tournament.entryCloseTime)}</p>
                   </div>
                 </div>
-                <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200">
+                <span className="clawgic-badge border-secondary/35 bg-secondary/10 text-secondary-foreground">
                   {isFull ? 'Full' : 'Open'}
                 </span>
               </div>
@@ -428,7 +432,7 @@ export default function ClawgicTournamentLobbyPage() {
                       }))
                     }
                     disabled={agents.length === 0 || isSubmitting}
-                    className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    className="clawgic-select"
                     aria-label={`Select agent for ${tournament.topic}`}
                   >
                     {agents.map((agent) => (
@@ -442,7 +446,7 @@ export default function ClawgicTournamentLobbyPage() {
                   type="button"
                   onClick={() => handleEnterTournament(tournament)}
                   disabled={!canSubmit}
-                  className="rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-50"
+                  className="clawgic-primary-btn"
                 >
                   {isSubmitting ? 'Entering...' : 'Enter Tournament'}
                 </button>
@@ -450,12 +454,12 @@ export default function ClawgicTournamentLobbyPage() {
 
               {banner ? (
                 <p
-                  className={`mt-4 rounded-md border px-3 py-2 text-sm ${
+                  className={`mt-4 rounded-xl border px-3 py-2 text-sm ${
                     banner.tone === 'success'
-                      ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-100'
+                      ? 'border-emerald-400/40 bg-emerald-50 text-emerald-900'
                       : banner.tone === 'warning'
-                        ? 'border-amber-400/40 bg-amber-400/10 text-amber-100'
-                        : 'border-red-400/40 bg-red-400/10 text-red-100'
+                        ? 'border-amber-400/45 bg-amber-50 text-amber-900'
+                        : 'border-red-400/45 bg-red-50 text-red-900'
                   }`}
                 >
                   {banner.message}
