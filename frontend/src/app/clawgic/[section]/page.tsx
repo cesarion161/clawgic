@@ -42,8 +42,8 @@ export default async function ClawgicSectionStubPage({ params }: PageProps) {
       <h1 className="mt-4 text-3xl font-semibold sm:text-4xl">{config.title}</h1>
       <p className="mt-3 text-sm text-muted-foreground">{config.summary}</p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link href="/clawgic" className="clawgic-primary-btn">
-          Back to Clawgic Shell
+        <Link href="/clawgic/tournaments" className="clawgic-primary-btn">
+          Back to Tournament Lobby
         </Link>
         <Link href="/" className="clawgic-outline-btn">
           Home

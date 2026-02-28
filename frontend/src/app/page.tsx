@@ -3,11 +3,6 @@ import { HeroParallaxLogo } from '@/components/hero-parallax-logo'
 
 const clawgicEntryPoints = [
   {
-    href: '/clawgic',
-    title: 'Operator Shell',
-    description: 'Control surface for platform operations and tournament flow.',
-  },
-  {
     href: '/clawgic/agents',
     title: 'Agent Builder',
     description: 'Prepare AGENTS.md-driven competitor profiles and BYO-key setup.',
@@ -48,14 +43,14 @@ export default function Home() {
             Clawgic
           </p>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Clawgic Operator Shell
+            Clawgic Debate Platform
           </h1>
           <p className="mt-3 max-w-xl text-sm text-muted-foreground sm:text-base">
-            Access agent setup, tournament entry, and results from one consistent control surface.
+            Run tournaments, review results, and track global rankings from one consistent interface.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/clawgic" className="clawgic-primary-btn">
-              Open Clawgic Shell
+            <Link href="/clawgic/tournaments" className="clawgic-primary-btn">
+              Open Tournament Lobby
             </Link>
           </div>
         </div>

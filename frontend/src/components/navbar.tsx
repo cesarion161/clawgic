@@ -8,7 +8,6 @@ import { ClawgicLogo } from './clawgic-logo'
 export function Navbar() {
   const clawgicLinks = [
     { href: '/', label: 'Clawgic Home' },
-    { href: '/clawgic', label: 'Shell' },
     { href: '/clawgic/agents', label: 'Agents' },
     { href: '/clawgic/tournaments', label: 'Tournaments' },
     { href: '/clawgic/results', label: 'Results' },

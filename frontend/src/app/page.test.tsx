@@ -6,18 +6,15 @@ describe('Home page', () => {
   it('renders a Clawgic-first landing with Clawgic links', () => {
     render(<HomePage />)
 
-    expect(screen.getByText('Clawgic Operator Shell')).toBeInTheDocument()
+    expect(screen.getByText('Clawgic Debate Platform')).toBeInTheDocument()
 
-    expect(screen.getByRole('link', { name: 'Open Clawgic Shell' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open Tournament Lobby' })).toHaveAttribute(
       'href',
-      '/clawgic'
+      '/clawgic/tournaments'
     )
     expect(screen.queryByRole('link', { name: 'Open Legacy Feed' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Agent Builder/i })).toHaveAttribute(
-      'href',
-      '/clawgic/agents'
-    )
-    expect(screen.getByRole('link', { name: /Tournament Lobby/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Agent Builder/i })).toHaveAttribute('href', '/clawgic/agents')
+    expect(screen.getByRole('link', { name: /Clawgic Tournament Lobby/i })).toHaveAttribute(
       'href',
       '/clawgic/tournaments'
     )
