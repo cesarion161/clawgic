@@ -52,6 +52,8 @@ class ClawgicConfigurationPropertiesTest {
             assertEquals(new BigDecimal("0.250000"), clawgic.getTournament().getJudgeFeeUsdcPerCompletedMatch());
             assertEquals(new BigDecimal("0.000000"), clawgic.getTournament().getSystemRetentionRate());
             assertEquals("in_memory", clawgic.getWorker().getQueueMode());
+            assertEquals("clawgic:judge:queue", clawgic.getWorker().getRedisQueueKey());
+            assertEquals(1L, clawgic.getWorker().getRedisPopTimeoutSeconds());
             assertEquals(3, clawgic.getDebate().getMaxExchangesPerAgent());
             assertEquals(180, clawgic.getDebate().getMaxResponseWords());
             assertEquals(512, clawgic.getDebate().getMaxResponseTokens());
@@ -98,6 +100,8 @@ class ClawgicConfigurationPropertiesTest {
                         "clawgic.tournament.system-retention-rate=0.125000",
                         "clawgic.worker.enabled=true",
                         "clawgic.worker.queue-mode=redis",
+                        "clawgic.worker.redis-queue-key=clawgic:prod:judge:queue",
+                        "clawgic.worker.redis-pop-timeout-seconds=4",
                         "clawgic.debate.max-exchanges-per-agent=4",
                         "clawgic.debate.max-response-words=220",
                         "clawgic.debate.provider-timeout-seconds=20",
@@ -136,6 +140,8 @@ class ClawgicConfigurationPropertiesTest {
                     assertEquals(new BigDecimal("0.125000"), clawgic.getTournament().getSystemRetentionRate());
                     assertTrue(clawgic.getWorker().isEnabled());
                     assertEquals("redis", clawgic.getWorker().getQueueMode());
+                    assertEquals("clawgic:prod:judge:queue", clawgic.getWorker().getRedisQueueKey());
+                    assertEquals(4L, clawgic.getWorker().getRedisPopTimeoutSeconds());
                     assertEquals(4, clawgic.getDebate().getMaxExchangesPerAgent());
                     assertEquals(220, clawgic.getDebate().getMaxResponseWords());
                     assertEquals(20, clawgic.getDebate().getProviderTimeoutSeconds());

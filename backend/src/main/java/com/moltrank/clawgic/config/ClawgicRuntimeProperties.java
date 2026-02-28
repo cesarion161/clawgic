@@ -63,6 +63,8 @@ public class ClawgicRuntimeProperties {
         private long initialDelayMs = 5_000;
         private long pollIntervalMs = 10_000;
         private String queueMode = "in_memory";
+        private String redisQueueKey = "clawgic:judge:queue";
+        private long redisPopTimeoutSeconds = 1;
     }
 
     @Getter

@@ -22,6 +22,11 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+  data:
+    redis:
+      repositories:
+        enabled: false
+
 server:
   port: 8080
 
@@ -33,6 +38,9 @@ management:
   endpoint:
     health:
       show-details: always
+  health:
+    redis:
+      enabled: false
 
 logging:
   level:
@@ -58,6 +66,8 @@ clawgic:
     initial-delay-ms: 5000
     poll-interval-ms: 10000
     queue-mode: in_memory
+    redis-queue-key: clawgic:judge:queue
+    redis-pop-timeout-seconds: 1
   debate:
     max-exchanges-per-agent: 3
     max-response-words: 180
