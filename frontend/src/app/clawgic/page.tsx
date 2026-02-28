@@ -10,8 +10,8 @@ const sections = [
   {
     href: '/clawgic/tournaments',
     title: 'Tournaments',
-    status: 'Planned UI stub',
-    description: 'Upcoming debate events, bracket seeding, and entry flow checkpoints.',
+    status: 'Live lobby',
+    description: 'Browse upcoming events and enter tournaments through the dev-bypass flow.',
   },
   {
     href: '/clawgic/matches',

@@ -2,11 +2,57 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api'
 
+type ParsedApiErrorBody = {
+  detail?: string
+  message?: string
+  error?: string
+  title?: string
+}
+
+type ApiRequestErrorInit = {
+  url: string
+  status: number
+  statusText: string
+  body: string
+  detail?: string
+}
+
+export class ApiRequestError extends Error {
+  readonly url: string
+  readonly status: number
+  readonly statusText: string
+  readonly body: string
+  readonly detail?: string
+
+  constructor(message: string, init: ApiRequestErrorInit) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.url = init.url
+    this.status = init.status
+    this.statusText = init.statusText
+    this.body = init.body
+    this.detail = init.detail
+  }
+}
+
 export class ApiClient {
   private baseUrl: string
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl
+  }
+
+  private static parseErrorDetail(errorBody: string): string | undefined {
+    if (!errorBody) {
+      return undefined
+    }
+
+    try {
+      const parsed = JSON.parse(errorBody) as ParsedApiErrorBody
+      return parsed.detail || parsed.message || parsed.error || parsed.title
+    } catch {
+      return undefined
+    }
   }
 
   private async request<T>(
@@ -26,13 +72,24 @@ export class ApiClient {
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => 'Unable to read error response')
+        const errorDetail = ApiClient.parseErrorDetail(errorBody)
         console.error(`API request failed:`, {
           url,
           status: response.status,
           statusText: response.statusText,
           body: errorBody,
+          detail: errorDetail,
         })
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+        throw new ApiRequestError(
+          `API request failed: ${response.status} ${response.statusText}`,
+          {
+            url,
+            status: response.status,
+            statusText: response.statusText,
+            body: errorBody,
+            detail: errorDetail,
+          }
+        )
       }
 
       try {
@@ -45,6 +102,9 @@ export class ApiClient {
         throw new Error(`API request failed: invalid JSON response`)
       }
     } catch (error) {
+      if (error instanceof ApiRequestError) {
+        throw error
+      }
       if (error instanceof Error && error.message.includes('API request failed')) {
         throw error
       }

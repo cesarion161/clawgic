@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ApiClient } from './api-client'
+import { ApiClient, ApiRequestError } from './api-client'
 
 describe('ApiClient', () => {
   let client: ApiClient
@@ -109,6 +109,51 @@ describe('ApiClient', () => {
       await expect(client.get('/missing')).rejects.toThrow(
         'API request failed: 404 Not Found'
       )
+    })
+
+    it('throws ApiRequestError with parsed problem detail when provided', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              type: 'about:blank',
+              title: 'Conflict',
+              status: 409,
+              detail: 'Tournament entry capacity reached',
+            })
+          ),
+      })
+
+      await expect(client.post('/clawgic/tournaments/abc/enter', { agentId: '123' })).rejects.toMatchObject({
+        name: 'ApiRequestError',
+        status: 409,
+        statusText: 'Conflict',
+        detail: 'Tournament entry capacity reached',
+      })
+    })
+
+    it('throws ApiRequestError with undefined detail for non-json response body', async () => {
+      expect.assertions(3)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        text: () => Promise.resolve('plain-text failure'),
+      })
+
+      try {
+        await client.get('/plain-error')
+        throw new Error('Expected ApiRequestError to be thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiRequestError)
+        if (error instanceof ApiRequestError) {
+          expect(error.detail).toBeUndefined()
+          expect(error.body).toBe('plain-text failure')
+        }
+      }
     })
 
     it('logs error details on non-OK response', async () => {
