@@ -76,9 +76,13 @@ class ClawgicConfigurationPropertiesTest {
             assertTrue(provider.getKeyRefModels().isEmpty());
 
             assertTrue(judge.isEnabled());
+            assertEquals("openai", judge.getProvider());
             assertEquals("gpt-4o", judge.getModel());
+            assertEquals("", judge.getOpenaiApiKey());
             assertTrue(judge.isStrictJson());
             assertEquals(2, judge.getMaxRetries());
+            assertEquals(2, judge.getMalformedJsonMaxAttempts());
+            assertEquals(512, judge.getMaxResponseTokens());
             assertEquals(List.of("mock-judge-primary"), judge.getKeys());
 
             assertEquals("local-dev-v1", apiKeyEncryption.getActiveKeyId());
@@ -133,7 +137,11 @@ class ClawgicConfigurationPropertiesTest {
                         "clawgic.provider.min-response-tokens=96",
                         "clawgic.provider.key-ref-models[team/openai/primary]=gpt-4.1",
                         "clawgic.judge.model=gpt-4.1",
+                        "clawgic.judge.provider=openai",
+                        "clawgic.judge.openai-api-key=sk-test-judge-key",
                         "clawgic.judge.max-retries=4",
+                        "clawgic.judge.malformed-json-max-attempts=3",
+                        "clawgic.judge.max-response-tokens=640",
                         "clawgic.judge.keys[0]=mock-judge-primary",
                         "clawgic.judge.keys[1]=mock-judge-secondary",
                         "clawgic.agent-key-encryption.active-key-id=rotate-v2",
@@ -185,8 +193,12 @@ class ClawgicConfigurationPropertiesTest {
                     assertEquals(96, provider.getMinResponseTokens());
                     assertEquals("gpt-4.1", provider.getKeyRefModels().get("team/openai/primary"));
 
+                    assertEquals("openai", judge.getProvider());
                     assertEquals("gpt-4.1", judge.getModel());
+                    assertEquals("sk-test-judge-key", judge.getOpenaiApiKey());
                     assertEquals(4, judge.getMaxRetries());
+                    assertEquals(3, judge.getMalformedJsonMaxAttempts());
+                    assertEquals(640, judge.getMaxResponseTokens());
                     assertEquals(List.of("mock-judge-primary", "mock-judge-secondary"), judge.getKeys());
 
                     assertEquals("rotate-v2", apiKeyEncryption.getActiveKeyId());

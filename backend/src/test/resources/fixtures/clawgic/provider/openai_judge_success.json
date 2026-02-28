@@ -1,0 +1,14 @@
+{
+  "id": "chatcmpl-judge-success",
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"winner_id\":\"00000000-0000-0000-0000-000000000901\",\"agent_1\":{\"logic\":8,\"persona_adherence\":7,\"rebuttal_strength\":9},\"agent_2\":{\"logic\":6,\"persona_adherence\":5,\"rebuttal_strength\":6},\"reasoning\":\"Agent 1 delivered stronger rebuttals and maintained persona consistency.\"}"
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}

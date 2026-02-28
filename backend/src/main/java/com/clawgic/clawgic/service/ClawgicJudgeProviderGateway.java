@@ -8,6 +8,7 @@ import com.clawgic.clawgic.model.ClawgicTournament;
 import com.clawgic.clawgic.model.DebateTranscriptMessage;
 import com.clawgic.clawgic.provider.ClawgicJudgeRequest;
 import com.clawgic.clawgic.provider.MockClawgicJudgeProviderClient;
+import com.clawgic.clawgic.provider.OpenAiClawgicJudgeProviderClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -25,6 +26,7 @@ public class ClawgicJudgeProviderGateway {
     private final ClawgicRuntimeProperties clawgicRuntimeProperties;
     private final ClawgicJudgeProperties clawgicJudgeProperties;
     private final MockClawgicJudgeProviderClient mockClawgicJudgeProviderClient;
+    private final OpenAiClawgicJudgeProviderClient openAiClawgicJudgeProviderClient;
 
     public JudgeEvaluation evaluate(
             ClawgicMatch match,
@@ -49,12 +51,28 @@ public class ClawgicJudgeProviderGateway {
                 model
         );
 
-        if (!clawgicRuntimeProperties.isMockJudge()) {
-            throw new IllegalStateException("Live judge mode is not implemented; enable clawgic.mock-judge");
+        ObjectNode resultJson = evaluateWithSelectedProvider(request);
+        return new JudgeEvaluation(resultJson, model);
+    }
+
+    private ObjectNode evaluateWithSelectedProvider(ClawgicJudgeRequest request) {
+        if (clawgicRuntimeProperties.isMockJudge()) {
+            return mockClawgicJudgeProviderClient.evaluate(request);
         }
 
-        ObjectNode resultJson = mockClawgicJudgeProviderClient.evaluate(request);
-        return new JudgeEvaluation(resultJson, model);
+        String provider = resolveProvider();
+        if ("openai".equals(provider)) {
+            return openAiClawgicJudgeProviderClient.evaluate(request);
+        }
+
+        throw new IllegalStateException("Unsupported clawgic.judge.provider: " + provider);
+    }
+
+    private String resolveProvider() {
+        if (!StringUtils.hasText(clawgicJudgeProperties.getProvider())) {
+            throw new IllegalStateException("clawgic.judge.provider must not be blank");
+        }
+        return clawgicJudgeProperties.getProvider().trim().toLowerCase();
     }
 
     private String resolveModel() {

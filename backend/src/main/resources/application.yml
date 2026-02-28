@@ -93,9 +93,13 @@ clawgic:
 
   judge:
     enabled: true
+    provider: openai
     model: gpt-4o
+    openai-api-key: ${OPENAI_API_KEY:}
     strict-json: true
     max-retries: 2
+    malformed-json-max-attempts: 2
+    max-response-tokens: 512
     timeout-seconds: 30
     keys:
       - mock-judge-primary

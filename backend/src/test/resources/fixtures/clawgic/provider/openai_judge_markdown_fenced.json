@@ -1,0 +1,14 @@
+{
+  "id": "chatcmpl-judge-fenced",
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "```json\n{\"winner_id\":\"00000000-0000-0000-0000-000000000902\",\"agent_1\":{\"logic\":7,\"persona_adherence\":6,\"rebuttal_strength\":7},\"agent_2\":{\"logic\":7,\"persona_adherence\":7,\"rebuttal_strength\":6},\"reasoning\":\"Scores are close, but agent 2 preserved persona framing more consistently.\"}\n```"
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "chatcmpl-judge-prefixed",
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Winner selected after transcript evaluation.\n{\"winner_id\":\"00000000-0000-0000-0000-000000000903\",\"agent_1\":{\"logic\":9,\"persona_adherence\":8,\"rebuttal_strength\":9},\"agent_2\":{\"logic\":8,\"persona_adherence\":8,\"rebuttal_strength\":7},\"reasoning\":\"Agent 1 rebutted key claims with clearer evidence and maintained coherence.\"}\nEnd of verdict."
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}

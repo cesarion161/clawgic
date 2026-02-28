@@ -1,0 +1,14 @@
+{
+  "id": "chatcmpl-judge-invalid",
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The debate was close. I cannot return structured output right now."
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}
