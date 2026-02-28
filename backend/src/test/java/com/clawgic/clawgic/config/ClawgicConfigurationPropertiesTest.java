@@ -62,6 +62,17 @@ class ClawgicConfigurationPropertiesTest {
             assertEquals("gpt-4o-mini", provider.getOpenaiDefaultModel());
             assertEquals("claude-3-5-sonnet-latest", provider.getAnthropicDefaultModel());
             assertEquals("clawgic-mock-v1", provider.getMockModel());
+            assertEquals("https://api.openai.com", provider.getOpenaiBaseUrl());
+            assertEquals("https://api.anthropic.com", provider.getAnthropicBaseUrl());
+            assertEquals("2023-06-01", provider.getAnthropicVersion());
+            assertEquals(0.2d, provider.getOpenaiTemperature());
+            assertEquals(0.2d, provider.getAnthropicTemperature());
+            assertEquals(2, provider.getRetryMaxAttempts());
+            assertEquals(250L, provider.getRetryBackoffMs());
+            assertEquals(3_000, provider.getConnectTimeoutMs());
+            assertEquals(20_000, provider.getReadTimeoutMs());
+            assertEquals(2, provider.getMaxTokensPerWord());
+            assertEquals(64, provider.getMinResponseTokens());
             assertTrue(provider.getKeyRefModels().isEmpty());
 
             assertTrue(judge.isEnabled());
@@ -109,6 +120,17 @@ class ClawgicConfigurationPropertiesTest {
                         "clawgic.provider.openai-default-model=gpt-4.1-mini",
                         "clawgic.provider.anthropic-default-model=claude-3-7-sonnet-latest",
                         "clawgic.provider.mock-model=clawgic-mock-v2",
+                        "clawgic.provider.openai-base-url=https://api.openai.example",
+                        "clawgic.provider.anthropic-base-url=https://api.anthropic.example",
+                        "clawgic.provider.anthropic-version=2024-10-22",
+                        "clawgic.provider.openai-temperature=0.15",
+                        "clawgic.provider.anthropic-temperature=0.35",
+                        "clawgic.provider.retry-max-attempts=4",
+                        "clawgic.provider.retry-backoff-ms=600",
+                        "clawgic.provider.connect-timeout-ms=5000",
+                        "clawgic.provider.read-timeout-ms=45000",
+                        "clawgic.provider.max-tokens-per-word=3",
+                        "clawgic.provider.min-response-tokens=96",
                         "clawgic.provider.key-ref-models[team/openai/primary]=gpt-4.1",
                         "clawgic.judge.model=gpt-4.1",
                         "clawgic.judge.max-retries=4",
@@ -150,6 +172,17 @@ class ClawgicConfigurationPropertiesTest {
                     assertEquals("gpt-4.1-mini", provider.getOpenaiDefaultModel());
                     assertEquals("claude-3-7-sonnet-latest", provider.getAnthropicDefaultModel());
                     assertEquals("clawgic-mock-v2", provider.getMockModel());
+                    assertEquals("https://api.openai.example", provider.getOpenaiBaseUrl());
+                    assertEquals("https://api.anthropic.example", provider.getAnthropicBaseUrl());
+                    assertEquals("2024-10-22", provider.getAnthropicVersion());
+                    assertEquals(0.15d, provider.getOpenaiTemperature());
+                    assertEquals(0.35d, provider.getAnthropicTemperature());
+                    assertEquals(4, provider.getRetryMaxAttempts());
+                    assertEquals(600L, provider.getRetryBackoffMs());
+                    assertEquals(5_000, provider.getConnectTimeoutMs());
+                    assertEquals(45_000, provider.getReadTimeoutMs());
+                    assertEquals(3, provider.getMaxTokensPerWord());
+                    assertEquals(96, provider.getMinResponseTokens());
                     assertEquals("gpt-4.1", provider.getKeyRefModels().get("team/openai/primary"));
 
                     assertEquals("gpt-4.1", judge.getModel());

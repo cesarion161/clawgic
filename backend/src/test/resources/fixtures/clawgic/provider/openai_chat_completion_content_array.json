@@ -1,0 +1,23 @@
+{
+  "id": "chatcmpl-test-002",
+  "object": "chat.completion",
+  "model": "gpt-4.1-mini",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "First structured line."
+          },
+          {
+            "type": "text",
+            "text": "Second structured line."
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "msg_test_invalid",
+  "type": "message",
+  "model": "claude-3-5-sonnet-latest",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "tool_use",
+      "name": "calculator"
+    }
+  ]
+}

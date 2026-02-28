@@ -1,0 +1,13 @@
+{
+  "id": "chatcmpl-test-invalid",
+  "object": "chat.completion",
+  "model": "gpt-4o-mini",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant"
+      }
+    }
+  ]
+}

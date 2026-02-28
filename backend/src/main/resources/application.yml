@@ -75,9 +75,20 @@ clawgic:
     provider-timeout-seconds: 15
 
   provider:
+    openai-base-url: https://api.openai.com
+    anthropic-base-url: https://api.anthropic.com
+    anthropic-version: "2023-06-01"
     openai-default-model: gpt-4o-mini
     anthropic-default-model: claude-3-5-sonnet-latest
     mock-model: clawgic-mock-v1
+    openai-temperature: 0.2
+    anthropic-temperature: 0.2
+    retry-max-attempts: 2
+    retry-backoff-ms: 250
+    connect-timeout-ms: 3000
+    read-timeout-ms: 20000
+    max-tokens-per-word: 2
+    min-response-tokens: 64
     key-ref-models: {}
 
   judge:

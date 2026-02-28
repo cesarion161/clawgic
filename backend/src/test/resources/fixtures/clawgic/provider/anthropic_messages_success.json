@@ -1,0 +1,16 @@
+{
+  "id": "msg_test_001",
+  "type": "message",
+  "model": "claude-3-5-sonnet-latest",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "First Anthropic segment."
+    },
+    {
+      "type": "text",
+      "text": "Second Anthropic segment."
+    }
+  ]
+}
