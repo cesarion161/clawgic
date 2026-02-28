@@ -99,18 +99,18 @@ This starts:
 Clawgic is currently introduced behind backend flags in `backend/src/main/resources/application.yml`.
 
 Current defaults:
-- `clawgic.enabled=false`
+- `clawgic.enabled=true`
 - `clawgic.mock-provider=true`
 - `clawgic.mock-judge=true`
-- `clawgic.worker.enabled=false`
+- `clawgic.worker.enabled=true`
 - `x402.enabled=false`
 - `x402.dev-bypass-enabled=true`
 
-Example local override while developing Clawgic backend features:
+Example local run (defaults already enable Clawgic + worker):
 
 ```bash
 cd backend
-DB_PASSWORD=changeme ./gradlew bootRun --args='--clawgic.enabled=true --clawgic.worker.enabled=true'
+DB_PASSWORD=changeme ./gradlew bootRun
 ```
 
 ## Smoke Tests (Current State)

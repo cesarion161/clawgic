@@ -51,7 +51,7 @@ logging:
 # These defaults keep the existing MoltRank demo path intact while enabling
 # incremental Clawgic implementation behind explicit flags.
 clawgic:
-  enabled: false
+  enabled: true
   mock-provider: true
   mock-judge: true
   legacy-molt-rank-ui-enabled: true
@@ -62,7 +62,7 @@ clawgic:
     judge-fee-usdc-per-completed-match: 0.250000
     system-retention-rate: 0.000000
   worker:
-    enabled: false
+    enabled: true
     initial-delay-ms: 5000
     poll-interval-ms: 10000
     queue-mode: redis
@@ -121,8 +121,8 @@ moltrank:
     expected-reveals-per-curator: 6
     max-pairs-per-curator-per-round: 20
   ingestion:
-    enabled: true
-    run-on-startup: true
+    enabled: false
+    run-on-startup: false
     fetch-limit: 100
     initial-delay-ms: 60000
     interval-ms: 300000
