@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { ApiRequestError, apiClient } from '@/lib/api-client'
+import { buildSignedX402PaymentHeader, parseX402Challenge } from '@/lib/x402-payment'
 
 type ClawgicTournamentSummary = {
   tournamentId: string
@@ -34,6 +35,11 @@ type ClawgicTournamentEntry = {
 type EntryBanner = {
   tone: 'success' | 'warning' | 'error'
   message: string
+}
+
+type PaymentHeaderPayload = {
+  headerName: string
+  headerValue: string
 }
 
 function formatDateTime(value: string): string {
@@ -146,6 +152,97 @@ export default function ClawgicTournamentLobbyPage() {
     return map
   }, [agents])
 
+  async function createEntry(
+    tournamentId: string,
+    selectedAgentId: string,
+    paymentHeader?: PaymentHeaderPayload
+  ) {
+    return apiClient.post<ClawgicTournamentEntry>(
+      `/clawgic/tournaments/${tournamentId}/enter`,
+      { agentId: selectedAgentId },
+      paymentHeader
+        ? {
+            headers: {
+              [paymentHeader.headerName]: paymentHeader.headerValue,
+            },
+          }
+        : undefined
+    )
+  }
+
+  function handleEntrySuccess(
+    tournamentId: string,
+    selectedAgentId: string,
+    entry: ClawgicTournamentEntry,
+    usedX402: boolean
+  ) {
+    const selectedAgentName = agentsById.get(selectedAgentId)?.name || 'Selected agent'
+    setEnteredAgentIdsByTournament((previous) => ({
+      ...previous,
+      [tournamentId]: [...(previous[tournamentId] || []), selectedAgentId],
+    }))
+
+    const modeMessage = usedX402 ? ' x402 payment authorized and retried automatically.' : ''
+
+    setEntryBannerByTournament((previous) => ({
+      ...previous,
+      [tournamentId]: {
+        tone: 'success',
+        message:
+          `${selectedAgentName} entered successfully (status ${entry.status}).` +
+          (entry.seedSnapshotElo != null ? ` Seed Elo: ${entry.seedSnapshotElo}.` : '') +
+          modeMessage,
+      },
+    }))
+  }
+
+  function handleEntryError(tournamentId: string, error: unknown) {
+    if (error instanceof ApiRequestError && error.status === 409) {
+      const conflict = classifyEntryConflict(error)
+      if (conflict.tone === 'warning' && conflict.message.toLowerCase().includes('full')) {
+        setFullTournamentIds((previous) => ({ ...previous, [tournamentId]: true }))
+      }
+      setEntryBannerByTournament((previous) => ({
+        ...previous,
+        [tournamentId]: conflict,
+      }))
+      return
+    }
+
+    if (error instanceof ApiRequestError && error.status === 404) {
+      setEntryBannerByTournament((previous) => ({
+        ...previous,
+        [tournamentId]: {
+          tone: 'error',
+          message: 'Tournament or agent was not found. Refresh data and try again.',
+        },
+      }))
+      return
+    }
+
+    if (
+      error instanceof ApiRequestError &&
+      (error.status === 400 || error.status === 401 || error.status === 402 || error.status === 422)
+    ) {
+      setEntryBannerByTournament((previous) => ({
+        ...previous,
+        [tournamentId]: {
+          tone: 'error',
+          message: error.detail || 'x402 payment authorization failed. Check wallet state and retry.',
+        },
+      }))
+      return
+    }
+
+    setEntryBannerByTournament((previous) => ({
+      ...previous,
+      [tournamentId]: {
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Failed to submit tournament entry.',
+      },
+    }))
+  }
+
   async function handleEnterTournament(tournament: ClawgicTournamentSummary) {
     const tournamentId = tournament.tournamentId
     const selectedAgentId = selectedAgentByTournament[tournamentId]
@@ -183,61 +280,55 @@ export default function ClawgicTournamentLobbyPage() {
       return
     }
 
-    try {
-      setSubmittingTournamentId(tournamentId)
-
-      const entry = await apiClient.post<ClawgicTournamentEntry>(
-        `/clawgic/tournaments/${tournamentId}/enter`,
-        { agentId: selectedAgentId }
-      )
-
-      const selectedAgentName = agentsById.get(selectedAgentId)?.name || 'Selected agent'
-
-      setEnteredAgentIdsByTournament((previous) => ({
-        ...previous,
-        [tournamentId]: [...(previous[tournamentId] || []), selectedAgentId],
-      }))
-
-      setEntryBannerByTournament((previous) => ({
-        ...previous,
-        [tournamentId]: {
-          tone: 'success',
-          message:
-            `${selectedAgentName} entered successfully (status ${entry.status}).` +
-            (entry.seedSnapshotElo != null ? ` Seed Elo: ${entry.seedSnapshotElo}.` : ''),
-        },
-      }))
-    } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 409) {
-        const conflict = classifyEntryConflict(error)
-        if (conflict.tone === 'warning' && conflict.message.toLowerCase().includes('full')) {
-          setFullTournamentIds((previous) => ({ ...previous, [tournamentId]: true }))
-        }
-        setEntryBannerByTournament((previous) => ({
-          ...previous,
-          [tournamentId]: conflict,
-        }))
-        return
-      }
-
-      if (error instanceof ApiRequestError && error.status === 404) {
-        setEntryBannerByTournament((previous) => ({
-          ...previous,
-          [tournamentId]: {
-            tone: 'error',
-            message: 'Tournament or agent was not found. Refresh data and try again.',
-          },
-        }))
-        return
-      }
-
+    const selectedAgent = agentsById.get(selectedAgentId)
+    if (!selectedAgent) {
       setEntryBannerByTournament((previous) => ({
         ...previous,
         [tournamentId]: {
           tone: 'error',
-          message: error instanceof Error ? error.message : 'Failed to submit tournament entry.',
+          message: 'Selected agent details are missing. Refresh and try again.',
         },
       }))
+      return
+    }
+
+    try {
+      setSubmittingTournamentId(tournamentId)
+
+      const entry = await createEntry(tournamentId, selectedAgentId)
+      if (!entry) {
+        throw new Error('Entry request did not return a response body.')
+      }
+
+      handleEntrySuccess(tournamentId, selectedAgentId, entry, false)
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 402) {
+        const challenge = parseX402Challenge(error.body)
+        if (!challenge) {
+          handleEntryError(tournamentId, new Error('Received malformed x402 challenge from backend.'))
+          return
+        }
+
+        try {
+          const signedPayment = await buildSignedX402PaymentHeader({
+            challenge,
+            agentWalletAddress: selectedAgent.walletAddress,
+          })
+
+          const retryEntry = await createEntry(tournamentId, selectedAgentId, signedPayment)
+          if (!retryEntry) {
+            throw new Error('Entry retry did not return a response body.')
+          }
+
+          handleEntrySuccess(tournamentId, selectedAgentId, retryEntry, true)
+          return
+        } catch (paymentError) {
+          handleEntryError(tournamentId, paymentError)
+          return
+        }
+      }
+
+      handleEntryError(tournamentId, error)
     } finally {
       setSubmittingTournamentId(null)
     }
@@ -279,8 +370,8 @@ export default function ClawgicTournamentLobbyPage() {
         <p className="text-xs uppercase tracking-[0.14em] text-emerald-300">Clawgic MVP</p>
         <h1 className="mt-2 text-3xl font-semibold">Tournament Lobby</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Dev-bypass entry flow is active here (`x402.enabled=false`). x402 retry UX lands in the
-          next step.
+          Entry supports local dev-bypass and live <code>402 -&gt; X-PAYMENT</code> retry when{' '}
+          <code>x402.enabled=true</code>.
         </p>
         {agents.length === 0 ? (
           <p className="mt-4 text-sm text-amber-200">

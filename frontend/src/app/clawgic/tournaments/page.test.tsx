@@ -40,6 +40,20 @@ const agentsFixture = [
   },
 ]
 
+function x402ChallengeFixture() {
+  return {
+    scheme: 'x402',
+    network: 'base-sepolia',
+    chainId: 84532,
+    tokenAddress: '0x0000000000000000000000000000000000000a11',
+    priceUsdc: '5.000000',
+    recipient: '0x0000000000000000000000000000000000000b22',
+    paymentHeader: 'X-PAYMENT',
+    nonce: 'challenge-nonce-001',
+    challengeExpiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+  }
+}
+
 function mockResponse(init: MockResponseInit) {
   return {
     ok: init.ok,
@@ -52,12 +66,15 @@ function mockResponse(init: MockResponseInit) {
 
 describe('ClawgicTournamentLobbyPage', () => {
   beforeEach(() => {
+    mockFetch.mockReset()
     globalThis.fetch = mockFetch
     vi.spyOn(console, 'error').mockImplementation(() => {})
+    ;(window as Window & { ethereum?: unknown }).ethereum = undefined
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+    ;(window as Window & { ethereum?: unknown }).ethereum = undefined
   })
 
   it('renders loading then tournament details on successful data fetch', async () => {
@@ -154,6 +171,151 @@ describe('ClawgicTournamentLobbyPage', () => {
         body: JSON.stringify({ agentId: '00000000-0000-0000-0000-000000000911' }),
       })
     )
+  })
+
+  it('handles 402 challenge and retries entry with signed X-PAYMENT header', async () => {
+    const ethereumRequest = vi.fn(async (args: { method: string; params?: unknown[] | object }) => {
+      if (args.method === 'eth_chainId') {
+        return '0x14a34'
+      }
+      if (args.method === 'eth_requestAccounts') {
+        return [agentsFixture[0].walletAddress]
+      }
+      if (args.method === 'eth_signTypedData_v4') {
+        return `0x${'a'.repeat(130)}`
+      }
+      return null
+    })
+    ;(window as Window & { ethereum?: { request: typeof ethereumRequest } }).ethereum = {
+      request: ethereumRequest,
+    }
+
+    mockFetch
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          jsonBody: tournamentsFixture,
+        })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          jsonBody: agentsFixture,
+        })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: false,
+          status: 402,
+          statusText: 'Payment Required',
+          textBody: JSON.stringify(x402ChallengeFixture()),
+        })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: true,
+          status: 201,
+          statusText: 'Created',
+          jsonBody: {
+            entryId: '00000000-0000-0000-0000-000000000921',
+            tournamentId: tournamentsFixture[0].tournamentId,
+            agentId: agentsFixture[0].agentId,
+            walletAddress: agentsFixture[0].walletAddress,
+            status: 'CONFIRMED',
+            seedSnapshotElo: 1000,
+          },
+        })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Debate on deterministic mocks')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Tournament' }))
+
+    expect(await screen.findByText(/x402 payment authorized/i)).toBeInTheDocument()
+    expect(mockFetch).toHaveBeenCalledTimes(4)
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      4,
+      'http://localhost:8080/api/clawgic/tournaments/00000000-0000-0000-0000-000000000901/enter',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'X-PAYMENT': expect.any(String),
+        }),
+      })
+    )
+
+    const retryCall = mockFetch.mock.calls[3]
+    const requestInit = retryCall?.[1] as RequestInit
+    const headers = requestInit.headers as Record<string, string>
+    const paymentHeaderJson = JSON.parse(headers['X-PAYMENT']) as {
+      requestNonce: string
+      payload: {
+        authorization: {
+          signature: string
+        }
+      }
+    }
+
+    expect(paymentHeaderJson.requestNonce).toBe('challenge-nonce-001')
+    expect(paymentHeaderJson.payload.authorization.signature).toBe(`0x${'a'.repeat(130)}`)
+  })
+
+  it('shows wallet mismatch message when 402 retry signer does not match selected agent wallet', async () => {
+    const ethereumRequest = vi.fn(async (args: { method: string }) => {
+      if (args.method === 'eth_chainId') {
+        return '0x14a34'
+      }
+      if (args.method === 'eth_requestAccounts') {
+        return ['0x9999999999999999999999999999999999999999']
+      }
+      if (args.method === 'eth_signTypedData_v4') {
+        return `0x${'b'.repeat(130)}`
+      }
+      return null
+    })
+    ;(window as Window & { ethereum?: { request: typeof ethereumRequest } }).ethereum = {
+      request: ethereumRequest,
+    }
+
+    mockFetch
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          jsonBody: tournamentsFixture,
+        })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          jsonBody: agentsFixture,
+        })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: false,
+          status: 402,
+          statusText: 'Payment Required',
+          textBody: JSON.stringify(x402ChallengeFixture()),
+        })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Debate on deterministic mocks')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Tournament' }))
+
+    expect(await screen.findByText(/does not match selected agent wallet/i)).toBeInTheDocument()
+    expect(mockFetch).toHaveBeenCalledTimes(3)
   })
 
   it('shows full-state messaging when entry API returns capacity conflict', async () => {

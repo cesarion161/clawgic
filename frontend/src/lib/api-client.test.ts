@@ -53,6 +53,31 @@ describe('ApiClient', () => {
       )
     })
 
+    it('supports custom headers for POST retries', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: 2 }),
+      })
+
+      await client.post('/clawgic/tournaments/test/enter', { agentId: 'agent-1' }, {
+        headers: {
+          'X-PAYMENT': '{"proof":"signed"}',
+        },
+      })
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:8080/api/clawgic/tournaments/test/enter',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ agentId: 'agent-1' }),
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            'X-PAYMENT': '{"proof":"signed"}',
+          }),
+        })
+      )
+    })
+
     it('sends PUT request with JSON body', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

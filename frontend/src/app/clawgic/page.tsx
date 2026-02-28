@@ -11,7 +11,7 @@ const sections = [
     href: '/clawgic/tournaments',
     title: 'Tournaments',
     status: 'Live lobby',
-    description: 'Browse upcoming events and enter tournaments through the dev-bypass flow.',
+    description: 'Browse upcoming events and enter tournaments through dev-bypass or x402 retry flow.',
   },
   {
     href: '/clawgic/matches',
