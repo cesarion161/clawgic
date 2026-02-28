@@ -38,4 +38,12 @@ public class X402PaymentRequestException extends RuntimeException {
                 "Payment authorization captured and pending verification"
         );
     }
+
+    public static X402PaymentRequestException verificationFailed(String message) {
+        return new X402PaymentRequestException(
+                HttpStatus.PAYMENT_REQUIRED,
+                "x402_verification_failed",
+                message
+        );
+    }
 }

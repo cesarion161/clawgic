@@ -95,6 +95,9 @@ x402:
   default-entry-fee-usdc: 5.00
   payment-header-name: X-PAYMENT
   nonce-ttl-seconds: 300
+  eip3009-domain-name: USD Coin
+  eip3009-domain-version: "2"
+  token-decimals: 6
 
 solana:
   rpc:

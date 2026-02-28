@@ -34,4 +34,12 @@ public class X402Properties {
     private BigDecimal defaultEntryFeeUsdc = new BigDecimal("5.00");
     private String paymentHeaderName = "X-PAYMENT";
     private long nonceTtlSeconds = 300L;
+
+    /**
+     * EIP-3009/EIP-712 domain values used for signature verification.
+     * Defaults match USDC TransferWithAuthorization.
+     */
+    private String eip3009DomainName = "USD Coin";
+    private String eip3009DomainVersion = "2";
+    private int tokenDecimals = 6;
 }

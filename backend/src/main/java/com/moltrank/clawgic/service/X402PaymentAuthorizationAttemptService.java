@@ -19,15 +19,18 @@ public class X402PaymentAuthorizationAttemptService {
 
     private final ClawgicPaymentAuthorizationRepository clawgicPaymentAuthorizationRepository;
     private final X402PaymentHeaderParser x402PaymentHeaderParser;
+    private final X402Eip3009SignatureVerifier x402Eip3009SignatureVerifier;
     private final X402Properties x402Properties;
 
     public X402PaymentAuthorizationAttemptService(
             ClawgicPaymentAuthorizationRepository clawgicPaymentAuthorizationRepository,
             X402PaymentHeaderParser x402PaymentHeaderParser,
+            X402Eip3009SignatureVerifier x402Eip3009SignatureVerifier,
             X402Properties x402Properties
     ) {
         this.clawgicPaymentAuthorizationRepository = clawgicPaymentAuthorizationRepository;
         this.x402PaymentHeaderParser = x402PaymentHeaderParser;
+        this.x402Eip3009SignatureVerifier = x402Eip3009SignatureVerifier;
         this.x402Properties = x402Properties;
     }
 
@@ -88,6 +91,45 @@ public class X402PaymentAuthorizationAttemptService {
             throw X402PaymentRequestException.replayRejected(
                     "Duplicate payment authorization replay key for wallet"
             );
+        }
+    }
+
+    @Transactional(noRollbackFor = X402PaymentRequestException.class)
+    public ClawgicPaymentAuthorization verifyAndPersistAuthorizationOutcome(
+            UUID paymentAuthorizationId,
+            String expectedWalletAddress,
+            BigDecimal expectedAmountUsdc
+    ) {
+        ClawgicPaymentAuthorization authorization = clawgicPaymentAuthorizationRepository
+                .findById(paymentAuthorizationId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Payment authorization not found: " + paymentAuthorizationId
+                ));
+
+        OffsetDateTime now = OffsetDateTime.now();
+        try {
+            X402Eip3009SignatureVerifier.VerifiedTransferWithAuthorization verifiedAuthorization =
+                    x402Eip3009SignatureVerifier.verify(
+                            authorization.getPaymentHeaderJson(),
+                            expectedWalletAddress,
+                            expectedAmountUsdc
+                    );
+
+            authorization.setStatus(ClawgicPaymentAuthorizationStatus.AUTHORIZED);
+            authorization.setAmountAuthorizedUsdc(scaleUsdc(verifiedAuthorization.amountUsdc()));
+            authorization.setChainId(verifiedAuthorization.chainId());
+            authorization.setRecipientWalletAddress(verifiedAuthorization.to());
+            authorization.setAuthorizationNonce(verifiedAuthorization.nonceHex());
+            authorization.setFailureReason(null);
+            authorization.setVerifiedAt(now);
+            authorization.setUpdatedAt(now);
+            return clawgicPaymentAuthorizationRepository.saveAndFlush(authorization);
+        } catch (X402PaymentRequestException ex) {
+            authorization.setStatus(ClawgicPaymentAuthorizationStatus.REJECTED);
+            authorization.setFailureReason(ex.getMessage());
+            authorization.setUpdatedAt(now);
+            clawgicPaymentAuthorizationRepository.saveAndFlush(authorization);
+            throw ex;
         }
     }
 

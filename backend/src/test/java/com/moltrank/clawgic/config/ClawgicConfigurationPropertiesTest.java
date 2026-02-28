@@ -81,6 +81,9 @@ class ClawgicConfigurationPropertiesTest {
             assertEquals(84532L, x402.getChainId());
             assertEquals(new BigDecimal("5.00"), x402.getDefaultEntryFeeUsdc());
             assertEquals("X-PAYMENT", x402.getPaymentHeaderName());
+            assertEquals("USD Coin", x402.getEip3009DomainName());
+            assertEquals("2", x402.getEip3009DomainVersion());
+            assertEquals(6, x402.getTokenDecimals());
         });
     }
 
@@ -113,7 +116,10 @@ class ClawgicConfigurationPropertiesTest {
                         "x402.dev-bypass-enabled=false",
                         "x402.network=base-mainnet",
                         "x402.chain-id=8453",
-                        "x402.default-entry-fee-usdc=7.25"
+                        "x402.default-entry-fee-usdc=7.25",
+                        "x402.eip3009-domain-name=USDC Test",
+                        "x402.eip3009-domain-version=3",
+                        "x402.token-decimals=8"
                 )
                 .run(context -> {
                     ClawgicRuntimeProperties clawgic = context.getBean(ClawgicRuntimeProperties.class);
@@ -155,6 +161,9 @@ class ClawgicConfigurationPropertiesTest {
                     assertEquals("base-mainnet", x402.getNetwork());
                     assertEquals(8453L, x402.getChainId());
                     assertEquals(new BigDecimal("7.25"), x402.getDefaultEntryFeeUsdc());
+                    assertEquals("USDC Test", x402.getEip3009DomainName());
+                    assertEquals("3", x402.getEip3009DomainVersion());
+                    assertEquals(8, x402.getTokenDecimals());
                 });
     }
 }

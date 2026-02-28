@@ -136,7 +136,7 @@ public class ClawgicTournamentService {
         return clawgicResponseMapper.toTournamentSummaryResponses(upcomingTournaments);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = X402PaymentRequestException.class)
     public ClawgicTournamentResponses.TournamentEntry enterTournament(
             UUID tournamentId,
             ClawgicTournamentRequests.EnterTournamentRequest request
@@ -144,7 +144,7 @@ public class ClawgicTournamentService {
         return enterTournament(tournamentId, request, null);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = X402PaymentRequestException.class)
     public ClawgicTournamentResponses.TournamentEntry enterTournament(
             UUID tournamentId,
             ClawgicTournamentRequests.EnterTournamentRequest request,
@@ -199,12 +199,18 @@ public class ClawgicTournamentService {
                 .orElse(DEFAULT_ELO);
 
         if (x402Properties.isEnabled()) {
-            x402PaymentAuthorizationAttemptService.recordPendingVerificationAttempt(
-                    tournamentId,
-                    agentId,
+            ClawgicPaymentAuthorization authorization =
+                    x402PaymentAuthorizationAttemptService.recordPendingVerificationAttempt(
+                            tournamentId,
+                            agentId,
+                            agent.getWalletAddress(),
+                            tournament.getBaseEntryFeeUsdc(),
+                            paymentHeaderValue
+                    );
+            x402PaymentAuthorizationAttemptService.verifyAndPersistAuthorizationOutcome(
+                    authorization.getPaymentAuthorizationId(),
                     agent.getWalletAddress(),
-                    tournament.getBaseEntryFeeUsdc(),
-                    paymentHeaderValue
+                    tournament.getBaseEntryFeeUsdc()
             );
             throw X402PaymentRequestException.verificationPending();
         }

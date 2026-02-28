@@ -1,5 +1,9 @@
 package com.moltrank.clawgic.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.moltrank.clawgic.config.X402Properties;
 import com.moltrank.clawgic.dto.ClawgicTournamentRequests;
 import com.moltrank.clawgic.model.ClawgicAgent;
 import com.moltrank.clawgic.model.ClawgicPaymentAuthorization;
@@ -19,13 +23,21 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
+import org.web3j.crypto.ECKeyPair;
+import org.web3j.crypto.Keys;
+import org.web3j.crypto.Sign;
+import org.web3j.crypto.StructuredDataEncoder;
+import org.web3j.utils.Numeric;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -40,10 +52,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "moltrank.ingestion.enabled=false",
         "moltrank.ingestion.run-on-startup=false",
         "x402.enabled=true",
-        "x402.dev-bypass-enabled=false"
+        "x402.dev-bypass-enabled=false",
+        "x402.chain-id=84532",
+        "x402.token-address=0x0000000000000000000000000000000000000a11",
+        "x402.settlement-address=0x0000000000000000000000000000000000000b22",
+        "x402.eip3009-domain-name=USD Coin",
+        "x402.eip3009-domain-version=2",
+        "x402.token-decimals=6"
 })
 @Transactional
 class ClawgicTournamentX402AuthorizationIntegrationTest {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String PRIVATE_KEY_HEX =
+            "0x59c6995e998f97a5a0044976f4f3e6f7f2ee8f87f3d4f3f9127b8fcdab8f5b7d";
+    private static final ECKeyPair SIGNER_KEY_PAIR =
+            ECKeyPair.create(Numeric.hexStringToByteArray(PRIVATE_KEY_HEX));
+    private static final String SIGNER_WALLET = "0x" + Keys.getAddress(SIGNER_KEY_PAIR.getPublicKey());
+    private static final String RUN_ID = UUID.randomUUID().toString().replace("-", "");
 
     @Autowired
     private ClawgicTournamentService clawgicTournamentService;
@@ -63,34 +89,38 @@ class ClawgicTournamentX402AuthorizationIntegrationTest {
     @Autowired
     private ClawgicPaymentAuthorizationRepository clawgicPaymentAuthorizationRepository;
 
+    @Autowired
+    private X402Properties x402Properties;
+
     @Test
-    void enterTournamentWithValidX402HeaderPersistsPendingAuthorizationRecord() {
+    void enterTournamentWithValidX402HeaderPersistsAuthorizedAuthorizationRecord() throws Exception {
         OffsetDateTime now = OffsetDateTime.now();
-        String walletAddress = "0x9999999999999999999999999999999999999901";
-        createUser(walletAddress);
-        UUID agentId = createAgent(walletAddress, "x402 accepted");
+        createUser(SIGNER_WALLET);
+        UUID agentId = createAgent(SIGNER_WALLET, "x402 accepted");
         ClawgicTournament tournament = insertTournament(
-                "C32 accepted auth record",
+                "C33 accepted auth record",
                 now.plusHours(2),
                 now.plusHours(1)
+        );
+
+        String paymentHeader = buildSignedPaymentHeader(
+                "req-c33-accepted-01-" + RUN_ID,
+                "idem-c33-accepted-01-" + RUN_ID,
+                randomAuthorizationNonceHex(),
+                SIGNER_WALLET,
+                x402Properties.getSettlementAddress(),
+                x402Properties.getTokenAddress(),
+                x402Properties.getChainId(),
+                new BigInteger("5000000"),
+                Instant.now().getEpochSecond() - 60,
+                Instant.now().getEpochSecond() + 600
         );
 
         X402PaymentRequestException ex = assertThrows(X402PaymentRequestException.class, () ->
                 clawgicTournamentService.enterTournament(
                         tournament.getTournamentId(),
                         new ClawgicTournamentRequests.EnterTournamentRequest(agentId),
-                        """
-                                {
-                                  "requestNonce": "req-c32-accepted-01",
-                                  "idempotencyKey": "idem-c32-accepted-01",
-                                  "payload": {
-                                    "authorizationNonce": "auth-c32-accepted-01",
-                                    "amountUsdc": "5.000000",
-                                    "chainId": 84532,
-                                    "recipient": "0x000000000000000000000000000000000000c320"
-                                  }
-                                }
-                                """
+                        paymentHeader
                 )
         );
 
@@ -101,22 +131,66 @@ class ClawgicTournamentX402AuthorizationIntegrationTest {
                 clawgicPaymentAuthorizationRepository.findByTournamentIdOrderByCreatedAtAsc(tournament.getTournamentId());
         assertEquals(1, authorizations.size());
         ClawgicPaymentAuthorization authorization = authorizations.getFirst();
-        assertEquals(ClawgicPaymentAuthorizationStatus.PENDING_VERIFICATION, authorization.getStatus());
-        assertEquals("req-c32-accepted-01", authorization.getRequestNonce());
-        assertEquals("idem-c32-accepted-01", authorization.getIdempotencyKey());
-        assertEquals("auth-c32-accepted-01", authorization.getAuthorizationNonce());
+        assertEquals(ClawgicPaymentAuthorizationStatus.AUTHORIZED, authorization.getStatus());
+        assertEquals("req-c33-accepted-01-" + RUN_ID, authorization.getRequestNonce());
+        assertEquals("idem-c33-accepted-01-" + RUN_ID, authorization.getIdempotencyKey());
         assertEquals(new BigDecimal("5.000000"), authorization.getAmountAuthorizedUsdc());
-        assertEquals(84532L, authorization.getChainId());
-        assertEquals("0x000000000000000000000000000000000000c320", authorization.getRecipientWalletAddress());
+        assertEquals(x402Properties.getChainId(), authorization.getChainId());
+        assertEquals(x402Properties.getSettlementAddress(), authorization.getRecipientWalletAddress());
+        assertNotNull(authorization.getVerifiedAt());
         assertEquals(0, clawgicTournamentEntryRepository.findByTournamentIdOrderByCreatedAtAsc(tournament.getTournamentId()).size());
+    }
+
+    @Test
+    void enterTournamentWithInvalidSignaturePersistsRejectedAuthorizationRecord() throws Exception {
+        OffsetDateTime now = OffsetDateTime.now();
+        createUser(SIGNER_WALLET);
+        UUID agentId = createAgent(SIGNER_WALLET, "x402 bad signature");
+        ClawgicTournament tournament = insertTournament(
+                "C33 invalid signature",
+                now.plusHours(2),
+                now.plusHours(1)
+        );
+
+        String validHeader = buildSignedPaymentHeader(
+                "req-c33-bad-sig-01-" + RUN_ID,
+                "idem-c33-bad-sig-01-" + RUN_ID,
+                randomAuthorizationNonceHex(),
+                SIGNER_WALLET,
+                x402Properties.getSettlementAddress(),
+                x402Properties.getTokenAddress(),
+                x402Properties.getChainId(),
+                new BigInteger("5000000"),
+                Instant.now().getEpochSecond() - 60,
+                Instant.now().getEpochSecond() + 600
+        );
+        String tamperedHeader = tamperSignature(validHeader);
+
+        X402PaymentRequestException ex = assertThrows(X402PaymentRequestException.class, () ->
+                clawgicTournamentService.enterTournament(
+                        tournament.getTournamentId(),
+                        new ClawgicTournamentRequests.EnterTournamentRequest(agentId),
+                        tamperedHeader
+                )
+        );
+
+        assertEquals(HttpStatus.PAYMENT_REQUIRED, ex.getStatus());
+        assertEquals("x402_verification_failed", ex.getCode());
+
+        List<ClawgicPaymentAuthorization> authorizations =
+                clawgicPaymentAuthorizationRepository.findByTournamentIdOrderByCreatedAtAsc(tournament.getTournamentId());
+        assertEquals(1, authorizations.size());
+        ClawgicPaymentAuthorization authorization = authorizations.getFirst();
+        assertEquals(ClawgicPaymentAuthorizationStatus.REJECTED, authorization.getStatus());
+        assertNotNull(authorization.getFailureReason());
+        assertTrue(authorization.getFailureReason().contains("signature"));
     }
 
     @Test
     void enterTournamentRejectsMalformedX402Header() {
         OffsetDateTime now = OffsetDateTime.now();
-        String walletAddress = "0x9999999999999999999999999999999999999902";
-        createUser(walletAddress);
-        UUID agentId = createAgent(walletAddress, "x402 malformed");
+        createUser(SIGNER_WALLET);
+        UUID agentId = createAgent(SIGNER_WALLET, "x402 malformed");
         ClawgicTournament tournament = insertTournament(
                 "C32 malformed payload",
                 now.plusHours(2),
@@ -139,40 +213,55 @@ class ClawgicTournamentX402AuthorizationIntegrationTest {
     }
 
     @Test
-    void enterTournamentRejectsDuplicateRequestNonceReplay() {
+    void enterTournamentRejectsDuplicateRequestNonceReplay() throws Exception {
         OffsetDateTime now = OffsetDateTime.now();
-        String walletAddress = "0x9999999999999999999999999999999999999903";
-        createUser(walletAddress);
-        UUID agentId = createAgent(walletAddress, "x402 duplicate nonce");
+        createUser(SIGNER_WALLET);
+        UUID agentId = createAgent(SIGNER_WALLET, "x402 duplicate nonce");
         ClawgicTournament tournament = insertTournament(
                 "C32 duplicate nonce replay",
                 now.plusHours(2),
                 now.plusHours(1)
         );
 
+        String firstHeader = buildSignedPaymentHeader(
+                "req-c32-dup-nonce-01-" + RUN_ID,
+                "idem-c32-dup-nonce-01-" + RUN_ID,
+                randomAuthorizationNonceHex(),
+                SIGNER_WALLET,
+                x402Properties.getSettlementAddress(),
+                x402Properties.getTokenAddress(),
+                x402Properties.getChainId(),
+                new BigInteger("5000000"),
+                Instant.now().getEpochSecond() - 60,
+                Instant.now().getEpochSecond() + 600
+        );
+
         assertThrows(X402PaymentRequestException.class, () ->
                 clawgicTournamentService.enterTournament(
                         tournament.getTournamentId(),
                         new ClawgicTournamentRequests.EnterTournamentRequest(agentId),
-                        """
-                                {
-                                  "requestNonce": "req-c32-dup-nonce-01",
-                                  "idempotencyKey": "idem-c32-dup-nonce-01"
-                                }
-                                """
+                        firstHeader
                 )
+        );
+
+        String replayHeader = buildSignedPaymentHeader(
+                "req-c32-dup-nonce-01-" + RUN_ID,
+                "idem-c32-dup-nonce-02-" + RUN_ID,
+                randomAuthorizationNonceHex(),
+                SIGNER_WALLET,
+                x402Properties.getSettlementAddress(),
+                x402Properties.getTokenAddress(),
+                x402Properties.getChainId(),
+                new BigInteger("5000000"),
+                Instant.now().getEpochSecond() - 60,
+                Instant.now().getEpochSecond() + 600
         );
 
         X402PaymentRequestException replay = assertThrows(X402PaymentRequestException.class, () ->
                 clawgicTournamentService.enterTournament(
                         tournament.getTournamentId(),
                         new ClawgicTournamentRequests.EnterTournamentRequest(agentId),
-                        """
-                                {
-                                  "requestNonce": "req-c32-dup-nonce-01",
-                                  "idempotencyKey": "idem-c32-dup-nonce-02"
-                                }
-                                """
+                        replayHeader
                 )
         );
 
@@ -184,40 +273,55 @@ class ClawgicTournamentX402AuthorizationIntegrationTest {
     }
 
     @Test
-    void enterTournamentRejectsDuplicateIdempotencyKeyReplay() {
+    void enterTournamentRejectsDuplicateIdempotencyKeyReplay() throws Exception {
         OffsetDateTime now = OffsetDateTime.now();
-        String walletAddress = "0x9999999999999999999999999999999999999904";
-        createUser(walletAddress);
-        UUID agentId = createAgent(walletAddress, "x402 duplicate idempotency");
+        createUser(SIGNER_WALLET);
+        UUID agentId = createAgent(SIGNER_WALLET, "x402 duplicate idempotency");
         ClawgicTournament tournament = insertTournament(
                 "C32 duplicate idempotency replay",
                 now.plusHours(2),
                 now.plusHours(1)
         );
 
+        String firstHeader = buildSignedPaymentHeader(
+                "req-c32-dup-idem-01-" + RUN_ID,
+                "idem-c32-dup-idem-" + RUN_ID,
+                randomAuthorizationNonceHex(),
+                SIGNER_WALLET,
+                x402Properties.getSettlementAddress(),
+                x402Properties.getTokenAddress(),
+                x402Properties.getChainId(),
+                new BigInteger("5000000"),
+                Instant.now().getEpochSecond() - 60,
+                Instant.now().getEpochSecond() + 600
+        );
+
         assertThrows(X402PaymentRequestException.class, () ->
                 clawgicTournamentService.enterTournament(
                         tournament.getTournamentId(),
                         new ClawgicTournamentRequests.EnterTournamentRequest(agentId),
-                        """
-                                {
-                                  "requestNonce": "req-c32-dup-idem-01",
-                                  "idempotencyKey": "idem-c32-dup-idem"
-                                }
-                                """
+                        firstHeader
                 )
+        );
+
+        String replayHeader = buildSignedPaymentHeader(
+                "req-c32-dup-idem-02-" + RUN_ID,
+                "idem-c32-dup-idem-" + RUN_ID,
+                randomAuthorizationNonceHex(),
+                SIGNER_WALLET,
+                x402Properties.getSettlementAddress(),
+                x402Properties.getTokenAddress(),
+                x402Properties.getChainId(),
+                new BigInteger("5000000"),
+                Instant.now().getEpochSecond() - 60,
+                Instant.now().getEpochSecond() + 600
         );
 
         X402PaymentRequestException replay = assertThrows(X402PaymentRequestException.class, () ->
                 clawgicTournamentService.enterTournament(
                         tournament.getTournamentId(),
                         new ClawgicTournamentRequests.EnterTournamentRequest(agentId),
-                        """
-                                {
-                                  "requestNonce": "req-c32-dup-idem-02",
-                                  "idempotencyKey": "idem-c32-dup-idem"
-                                }
-                                """
+                        replayHeader
                 )
         );
 
@@ -228,7 +332,150 @@ class ClawgicTournamentX402AuthorizationIntegrationTest {
                 .size());
     }
 
+    private static String tamperSignature(String paymentHeaderJson) throws Exception {
+        ObjectNode root = (ObjectNode) OBJECT_MAPPER.readTree(paymentHeaderJson);
+        ObjectNode authorization = (ObjectNode) root.path("payload").path("authorization");
+        String signature = authorization.path("signature").asText();
+        int tamperIndex = Math.min(10, signature.length() - 1);
+        char currentChar = signature.charAt(tamperIndex);
+        authorization.put(
+                "signature",
+                signature.substring(0, tamperIndex)
+                        + (currentChar == 'a' ? 'b' : 'a')
+                        + signature.substring(tamperIndex + 1)
+        );
+        return OBJECT_MAPPER.writeValueAsString(root);
+    }
+
+    private static String buildSignedPaymentHeader(
+            String requestNonce,
+            String idempotencyKey,
+            String authorizationNonceHex,
+            String from,
+            String to,
+            String tokenAddress,
+            long chainId,
+            BigInteger value,
+            long validAfter,
+            long validBefore
+    ) throws Exception {
+        String signatureHex = signTransferWithAuthorization(
+                from,
+                to,
+                tokenAddress,
+                chainId,
+                value,
+                validAfter,
+                validBefore,
+                authorizationNonceHex
+        );
+
+        ObjectNode root = OBJECT_MAPPER.createObjectNode();
+        root.put("requestNonce", requestNonce);
+        root.put("idempotencyKey", idempotencyKey);
+
+        ObjectNode payload = root.putObject("payload");
+        payload.put("authorizationNonce", authorizationNonceHex);
+
+        ObjectNode domain = payload.putObject("domain");
+        domain.put("name", "USD Coin");
+        domain.put("version", "2");
+        domain.put("chainId", chainId);
+        domain.put("verifyingContract", tokenAddress);
+
+        ObjectNode authorization = payload.putObject("authorization");
+        authorization.put("from", from);
+        authorization.put("to", to);
+        authorization.put("value", value.toString());
+        authorization.put("validAfter", validAfter);
+        authorization.put("validBefore", validBefore);
+        authorization.put("nonce", authorizationNonceHex);
+        authorization.put("signature", signatureHex);
+
+        return OBJECT_MAPPER.writeValueAsString(root);
+    }
+
+    private static String signTransferWithAuthorization(
+            String from,
+            String to,
+            String tokenAddress,
+            long chainId,
+            BigInteger value,
+            long validAfter,
+            long validBefore,
+            String nonceHex
+    ) throws Exception {
+        ObjectNode typedData = OBJECT_MAPPER.createObjectNode();
+        ObjectNode types = typedData.putObject("types");
+
+        ArrayNode domainTypes = types.putArray("EIP712Domain");
+        domainTypes.add(typeField("name", "string"));
+        domainTypes.add(typeField("version", "string"));
+        domainTypes.add(typeField("chainId", "uint256"));
+        domainTypes.add(typeField("verifyingContract", "address"));
+
+        ArrayNode transferTypes = types.putArray("TransferWithAuthorization");
+        transferTypes.add(typeField("from", "address"));
+        transferTypes.add(typeField("to", "address"));
+        transferTypes.add(typeField("value", "uint256"));
+        transferTypes.add(typeField("validAfter", "uint256"));
+        transferTypes.add(typeField("validBefore", "uint256"));
+        transferTypes.add(typeField("nonce", "bytes32"));
+
+        typedData.put("primaryType", "TransferWithAuthorization");
+
+        ObjectNode domain = typedData.putObject("domain");
+        domain.put("name", "USD Coin");
+        domain.put("version", "2");
+        domain.put("chainId", chainId);
+        domain.put("verifyingContract", tokenAddress);
+
+        ObjectNode message = typedData.putObject("message");
+        message.put("from", from);
+        message.put("to", to);
+        message.put("value", value.toString());
+        message.put("validAfter", String.valueOf(validAfter));
+        message.put("validBefore", String.valueOf(validBefore));
+        message.put("nonce", authorizationNonceWithPrefix(nonceHex));
+
+        StructuredDataEncoder encoder = new StructuredDataEncoder(
+                OBJECT_MAPPER.writeValueAsString(typedData)
+        );
+        byte[] digest = encoder.hashStructuredData();
+        Sign.SignatureData signatureData = Sign.signMessage(digest, SIGNER_KEY_PAIR, false);
+        return signatureDataToHex(signatureData);
+    }
+
+    private static String authorizationNonceWithPrefix(String nonceHex) {
+        String clean = Numeric.cleanHexPrefix(nonceHex);
+        return "0x" + clean;
+    }
+
+    private static String randomAuthorizationNonceHex() {
+        return "0x"
+                + UUID.randomUUID().toString().replace("-", "")
+                + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private static ObjectNode typeField(String name, String type) {
+        ObjectNode node = OBJECT_MAPPER.createObjectNode();
+        node.put("name", name);
+        node.put("type", type);
+        return node;
+    }
+
+    private static String signatureDataToHex(Sign.SignatureData signatureData) {
+        byte[] signature = new byte[65];
+        System.arraycopy(signatureData.getR(), 0, signature, 0, 32);
+        System.arraycopy(signatureData.getS(), 0, signature, 32, 32);
+        signature[64] = signatureData.getV()[0];
+        return Numeric.toHexString(signature);
+    }
+
     private void createUser(String walletAddress) {
+        if (clawgicUserRepository.existsById(walletAddress)) {
+            return;
+        }
         ClawgicUser user = new ClawgicUser();
         user.setWalletAddress(walletAddress);
         user.setCreatedAt(OffsetDateTime.now());
