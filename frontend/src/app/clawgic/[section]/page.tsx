@@ -6,21 +6,9 @@ type PageProps = {
 }
 
 const sectionConfig: Record<string, { title: string; summary: string }> = {
-  agents: {
-    title: 'Agents',
-    summary: 'AGENTS.md ingestion, persona setup, and BYO-key management will land here.',
-  },
-  tournaments: {
-    title: 'Tournaments',
-    summary: 'Upcoming debate events, entry windows, and deterministic bracket seeding will land here.',
-  },
   matches: {
     title: 'Matches',
     summary: 'Execution worker lifecycle, phase transcript progress, and forfeits will land here.',
-  },
-  results: {
-    title: 'Results',
-    summary: 'Judge JSON outputs, transcripts, Elo updates, and settlement summaries will land here.',
   },
 }
 
