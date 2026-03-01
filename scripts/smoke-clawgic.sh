@@ -465,6 +465,54 @@ assert_x402_mode_expectation() {
   fi
 }
 
+run_lobby_eligibility_checks() {
+  if [[ -z "${SMOKE_TOURNAMENT_ID}" ]]; then
+    record_assertion_fail "lobby-eligibility-prerequisites" "missing tournament id"
+    return
+  fi
+
+  # Verify lobby listing includes eligibility fields for the created tournament
+  assert_request "lobby-eligibility-list" "GET" "/api/clawgic/tournaments" "200" ""
+  if [[ "${LAST_REQUEST_MATCHED_EXPECTED}" != "true" ]]; then
+    return
+  fi
+
+  assert_body_contains "lobby-has-canEnter-field" '"canEnter"'
+  assert_body_contains "lobby-has-entryState-field" '"entryState"'
+  assert_body_contains "lobby-has-currentEntries-field" '"currentEntries"'
+
+  # Create a closed-window tournament and verify its eligibility
+  local closed_start
+  local closed_entry_close
+  closed_start="$(iso_utc_plus_minutes 120)"
+  closed_entry_close="$(iso_utc_plus_minutes -5)"
+
+  local closed_payload
+  closed_payload="$(cat <<JSON
+{"topic":"C61 closed-window smoke ${RUN_ID}","startTime":"${closed_start}","entryCloseTime":"${closed_entry_close}","baseEntryFeeUsdc":5.0}
+JSON
+)"
+
+  assert_request "closed-tournament-create" "POST" "/api/clawgic/tournaments" "201" "${closed_payload}"
+  if [[ "${LAST_REQUEST_MATCHED_EXPECTED}" != "true" ]]; then
+    return
+  fi
+
+  local closed_tournament_id
+  if ! closed_tournament_id="$(response_json_get 'tournamentId' 2>/dev/null)" || [[ -z "${closed_tournament_id}" ]]; then
+    record_assertion_fail "closed-tournament-id-captured" "could not parse tournamentId"
+    return
+  fi
+  record_assertion_pass "closed-tournament-id-captured"
+
+  # Verify lobby shows closed tournament as non-enterable
+  assert_request "lobby-with-closed-tournament" "GET" "/api/clawgic/tournaments" "200" ""
+  if [[ "${LAST_REQUEST_MATCHED_EXPECTED}" == "true" ]]; then
+    assert_body_contains "lobby-contains-closed-tournament" "${closed_tournament_id}"
+    assert_body_contains "lobby-contains-entry-window-closed-state" '"ENTRY_WINDOW_CLOSED"'
+  fi
+}
+
 run_entry_and_bracket_checks() {
   if [[ -z "${SMOKE_TOURNAMENT_ID}" || -z "${SMOKE_AGENT_ID}" ]]; then
     record_assertion_fail "entry-flow-prerequisites" "missing tournament or agent id"
@@ -509,15 +557,32 @@ run_entry_and_bracket_checks() {
   if [[ "${DETECTED_X402_MODE}" == "bypass" ]]; then
     assert_json_equals "tournament-enter-agent-id" "agentId" "${SMOKE_AGENT_ID}"
 
+    # Duplicate entry: assert conflict code is machine-readable
     assert_request "tournament-enter-duplicate" "POST" \
       "/api/clawgic/tournaments/${SMOKE_TOURNAMENT_ID}/enter" \
       "409" \
       "${payload}"
+    if [[ "${LAST_REQUEST_MATCHED_EXPECTED}" == "true" ]]; then
+      assert_json_equals "duplicate-entry-conflict-code" "code" "already_entered"
+      assert_body_contains "duplicate-entry-has-message" '"message"'
+    fi
 
+    # Unknown tournament: assert structured error
     assert_request "unknown-tournament-enter" "POST" \
       "/api/clawgic/tournaments/${UNKNOWN_UUID}/enter" \
       "404" \
       "${payload}"
+
+    # Invalid agent: assert structured 404 error code
+    local invalid_agent_payload
+    invalid_agent_payload="{\"agentId\":\"${UNKNOWN_UUID}\"}"
+    assert_request "invalid-agent-enter" "POST" \
+      "/api/clawgic/tournaments/${SMOKE_TOURNAMENT_ID}/enter" \
+      "404" \
+      "${invalid_agent_payload}"
+    if [[ "${LAST_REQUEST_MATCHED_EXPECTED}" == "true" ]]; then
+      assert_json_equals "invalid-agent-conflict-code" "code" "invalid_agent"
+    fi
   fi
 
   assert_request "tournament-bracket-before-full" "POST" \
@@ -562,6 +627,7 @@ main() {
   run_static_checks
   run_agent_crud_checks
   run_tournament_crud_checks
+  run_lobby_eligibility_checks
   run_entry_and_bracket_checks
   print_summary_and_exit
 }

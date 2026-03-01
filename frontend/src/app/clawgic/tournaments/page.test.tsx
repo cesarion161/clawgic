@@ -616,6 +616,38 @@ describe('ClawgicTournamentLobbyPage', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2)
   })
 
+  it('shows invalid_agent messaging when entry API returns 404 with invalid_agent code', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: tournamentsFixture })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: false,
+          status: 404,
+          statusText: 'Not Found',
+          textBody: JSON.stringify({
+            code: 'invalid_agent',
+            message: 'Agent not found: 00000000-0000-0000-0000-000000000911',
+          }),
+        })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Debate on deterministic mocks')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Tournament' }))
+
+    expect(
+      await screen.findByText('Agent not found. Refresh and try again.')
+    ).toBeInTheDocument()
+    // invalid_agent is recoverable, so refresh button should be shown
+    expect(screen.getByRole('button', { name: 'Refresh lobby data' })).toBeInTheDocument()
+  })
+
   it('shows tournament_not_open messaging when entry API returns tournament_not_open conflict code', async () => {
     mockFetch
       .mockResolvedValueOnce(
