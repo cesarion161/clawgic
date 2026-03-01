@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiRequestError, apiClient } from '@/lib/api-client'
 import { buildSignedX402PaymentHeader, parseX402Challenge } from '@/lib/x402-payment'
 
@@ -41,6 +41,7 @@ type ClawgicTournamentEntry = {
 type EntryBanner = {
   tone: 'success' | 'warning' | 'error'
   message: string
+  recoverable?: boolean
 }
 
 type PaymentHeaderPayload = {
@@ -77,6 +78,7 @@ const CONFLICT_CODE_BANNERS: Record<string, EntryBanner> = {
   capacity_reached: {
     tone: 'warning',
     message: 'Tournament is full. Choose another tournament or wait for a new round.',
+    recoverable: true,
   },
   already_entered: {
     tone: 'warning',
@@ -85,14 +87,17 @@ const CONFLICT_CODE_BANNERS: Record<string, EntryBanner> = {
   entry_window_closed: {
     tone: 'warning',
     message: 'Entry window has closed for this tournament.',
+    recoverable: true,
   },
   tournament_not_open: {
     tone: 'warning',
     message: 'This tournament is not open for entries.',
+    recoverable: true,
   },
   invalid_agent: {
     tone: 'error',
     message: 'Agent not found. Refresh and try again.',
+    recoverable: true,
   },
 }
 
@@ -127,6 +132,7 @@ function entryStateBadge(tournament: ClawgicTournamentSummary): { label: string;
 
 export default function ClawgicTournamentLobbyPage() {
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [tournaments, setTournaments] = useState<ClawgicTournamentSummary[]>([])
   const [agents, setAgents] = useState<ClawgicAgentSummary[]>([])
@@ -136,6 +142,41 @@ export default function ClawgicTournamentLobbyPage() {
   const [enteredAgentIdsByTournament, setEnteredAgentIdsByTournament] = useState<Record<string, string[]>>({})
   const [fullTournamentIds, setFullTournamentIds] = useState<Record<string, boolean>>({})
 
+  const refreshLobbyData = useCallback(async () => {
+    const [fetchedTournaments, fetchedAgents] = await Promise.all([
+      apiClient.get<ClawgicTournamentSummary[]>('/clawgic/tournaments'),
+      apiClient.get<ClawgicAgentSummary[]>('/clawgic/agents'),
+    ])
+
+    setTournaments(fetchedTournaments)
+    setAgents(fetchedAgents)
+
+    // Sync client-side full/entered caches with backend truth
+    const updatedFull: Record<string, boolean> = {}
+    for (const t of fetchedTournaments) {
+      if (t.entryState === 'CAPACITY_REACHED') {
+        updatedFull[t.tournamentId] = true
+      }
+    }
+    setFullTournamentIds(updatedFull)
+
+    setSelectedAgentByTournament((previous) => {
+      if (fetchedAgents.length === 0) {
+        return {}
+      }
+
+      const defaultAgentId = fetchedAgents[0].agentId
+      const next: Record<string, string> = {}
+      for (const tournament of fetchedTournaments) {
+        next[tournament.tournamentId] =
+          previous[tournament.tournamentId] || defaultAgentId
+      }
+      return next
+    })
+
+    return { fetchedTournaments, fetchedAgents }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
 
@@ -144,31 +185,7 @@ export default function ClawgicTournamentLobbyPage() {
         setLoading(true)
         setErrorMessage(null)
 
-        const [fetchedTournaments, fetchedAgents] = await Promise.all([
-          apiClient.get<ClawgicTournamentSummary[]>('/clawgic/tournaments'),
-          apiClient.get<ClawgicAgentSummary[]>('/clawgic/agents'),
-        ])
-
-        if (cancelled) {
-          return
-        }
-
-        setTournaments(fetchedTournaments)
-        setAgents(fetchedAgents)
-
-        setSelectedAgentByTournament((previous) => {
-          if (fetchedAgents.length === 0) {
-            return {}
-          }
-
-          const defaultAgentId = fetchedAgents[0].agentId
-          const next: Record<string, string> = {}
-          for (const tournament of fetchedTournaments) {
-            next[tournament.tournamentId] =
-              previous[tournament.tournamentId] || defaultAgentId
-          }
-          return next
-        })
+        await refreshLobbyData()
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(
@@ -186,7 +203,19 @@ export default function ClawgicTournamentLobbyPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [refreshLobbyData])
+
+  async function handleRefreshLobby() {
+    try {
+      setRefreshing(true)
+      setEntryBannerByTournament({})
+      await refreshLobbyData()
+    } catch {
+      // Silent refresh failure — stale data is still usable
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const agentsById = useMemo(() => {
     const map = new Map<string, ClawgicAgentSummary>()
@@ -214,7 +243,7 @@ export default function ClawgicTournamentLobbyPage() {
     )
   }
 
-  function handleEntrySuccess(
+  async function handleEntrySuccess(
     tournamentId: string,
     selectedAgentId: string,
     entry: ClawgicTournamentEntry,
@@ -238,6 +267,13 @@ export default function ClawgicTournamentLobbyPage() {
           modeMessage,
       },
     }))
+
+    // Refresh tournament data from backend to sync entries/state
+    try {
+      await refreshLobbyData()
+    } catch {
+      // Silent — success banner is already shown
+    }
   }
 
   function handleEntryError(tournamentId: string, error: unknown) {
@@ -343,7 +379,7 @@ export default function ClawgicTournamentLobbyPage() {
         throw new Error('Entry request did not return a response body.')
       }
 
-      handleEntrySuccess(tournamentId, selectedAgentId, entry, false)
+      await handleEntrySuccess(tournamentId, selectedAgentId, entry, false)
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 402) {
         const challenge = parseX402Challenge(error.body)
@@ -363,7 +399,7 @@ export default function ClawgicTournamentLobbyPage() {
             throw new Error('Entry retry did not return a response body.')
           }
 
-          handleEntrySuccess(tournamentId, selectedAgentId, retryEntry, true)
+          await handleEntrySuccess(tournamentId, selectedAgentId, retryEntry, true)
           return
         } catch (paymentError) {
           handleEntryError(tournamentId, paymentError)
@@ -412,6 +448,14 @@ export default function ClawgicTournamentLobbyPage() {
       <section className="clawgic-surface clawgic-reveal p-6 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="clawgic-badge border-primary/35 bg-primary/10 text-accent-foreground">Clawgic</p>
+          <button
+            type="button"
+            onClick={handleRefreshLobby}
+            disabled={refreshing}
+            className="text-sm font-medium text-primary underline decoration-primary/40 hover:decoration-primary/70 disabled:opacity-50 disabled:no-underline"
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh lobby'}
+          </button>
         </div>
         <h1 className="mt-3 text-3xl font-semibold">Tournament Lobby</h1>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -509,7 +553,7 @@ export default function ClawgicTournamentLobbyPage() {
               </div>
 
               {banner ? (
-                <p
+                <div
                   className={`mt-4 rounded-xl border px-3 py-2 text-sm ${
                     banner.tone === 'success'
                       ? 'border-emerald-400/40 bg-emerald-50 text-emerald-900'
@@ -518,8 +562,18 @@ export default function ClawgicTournamentLobbyPage() {
                         : 'border-red-400/45 bg-red-50 text-red-900'
                   }`}
                 >
-                  {banner.message}
-                </p>
+                  <p>{banner.message}</p>
+                  {banner.recoverable ? (
+                    <button
+                      type="button"
+                      onClick={handleRefreshLobby}
+                      disabled={refreshing}
+                      className="mt-1 text-xs font-medium underline decoration-current/40 hover:decoration-current/70 disabled:opacity-50"
+                    >
+                      {refreshing ? 'Refreshing...' : 'Refresh lobby data'}
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
             </article>
           )

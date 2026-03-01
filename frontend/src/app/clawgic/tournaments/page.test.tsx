@@ -167,6 +167,13 @@ describe('ClawgicTournamentLobbyPage', () => {
           },
         })
       )
+      // post-entry refresh (tournaments + agents)
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: tournamentsFixture })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
 
     render(<ClawgicTournamentLobbyPage />)
     await screen.findByText('Debate on deterministic mocks')
@@ -241,6 +248,13 @@ describe('ClawgicTournamentLobbyPage', () => {
           },
         })
       )
+      // post-entry refresh (tournaments + agents)
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: tournamentsFixture })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
 
     render(<ClawgicTournamentLobbyPage />)
     await screen.findByText('Debate on deterministic mocks')
@@ -248,7 +262,7 @@ describe('ClawgicTournamentLobbyPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enter Tournament' }))
 
     expect(await screen.findByText(/x402 payment authorized/i)).toBeInTheDocument()
-    expect(mockFetch).toHaveBeenCalledTimes(4)
+    expect(mockFetch).toHaveBeenCalledTimes(6)
     expect(mockFetch).toHaveBeenNthCalledWith(
       4,
       'http://localhost:8080/api/clawgic/tournaments/00000000-0000-0000-0000-000000000901/enter',
@@ -630,5 +644,212 @@ describe('ClawgicTournamentLobbyPage', () => {
     expect(
       await screen.findByText('This tournament is not open for entries.')
     ).toBeInTheDocument()
+  })
+
+  it('refreshes lobby data after successful entry and updates entries count', async () => {
+    const updatedTournament = [
+      { ...tournamentsFixture[0], currentEntries: 2 },
+    ]
+
+    mockFetch
+      // initial load
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: tournamentsFixture })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+      // entry success
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: true,
+          status: 201,
+          statusText: 'Created',
+          jsonBody: {
+            entryId: '00000000-0000-0000-0000-000000000920',
+            tournamentId: tournamentsFixture[0].tournamentId,
+            agentId: agentsFixture[0].agentId,
+            walletAddress: agentsFixture[0].walletAddress,
+            status: 'CONFIRMED',
+            seedSnapshotElo: 1000,
+          },
+        })
+      )
+      // post-entry refresh
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: updatedTournament })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Entries: 1/4')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Tournament' }))
+
+    expect(await screen.findByText(/entered successfully/i)).toBeInTheDocument()
+    // After refresh, entries count is updated from backend
+    await waitFor(() => expect(screen.getByText('Entries: 2/4')).toBeInTheDocument())
+    // 5 total fetch calls: 2 initial + 1 entry + 2 refresh
+    expect(mockFetch).toHaveBeenCalledTimes(5)
+  })
+
+  it('shows Refresh lobby data button on recoverable conflict and clears banners on refresh', async () => {
+    const refreshedTournament = [
+      { ...tournamentsFixture[0], currentEntries: 3 },
+    ]
+
+    mockFetch
+      // initial load
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: tournamentsFixture })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+      // entry conflict
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: false,
+          status: 409,
+          statusText: 'Conflict',
+          textBody: JSON.stringify({
+            code: 'capacity_reached',
+            message: 'Tournament entry capacity reached.',
+          }),
+        })
+      )
+      // refresh after clicking recovery button
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: refreshedTournament })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Debate on deterministic mocks')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Tournament' }))
+
+    // Recoverable conflict shows banner with refresh button
+    expect(
+      await screen.findByText('Tournament is full. Choose another tournament or wait for a new round.')
+    ).toBeInTheDocument()
+    const refreshBtn = screen.getByRole('button', { name: 'Refresh lobby data' })
+    expect(refreshBtn).toBeInTheDocument()
+
+    // Click refresh clears banners and fetches fresh data
+    fireEvent.click(refreshBtn)
+
+    await waitFor(() => expect(screen.getByText('Entries: 3/4')).toBeInTheDocument())
+    // Banner should be cleared after refresh
+    expect(
+      screen.queryByText('Tournament is full. Choose another tournament or wait for a new round.')
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows top-level Refresh lobby button and refreshes data when clicked', async () => {
+    const refreshedTournament = [
+      { ...tournamentsFixture[0], currentEntries: 2 },
+    ]
+
+    mockFetch
+      // initial load
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: tournamentsFixture })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+      // refresh
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: refreshedTournament })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Entries: 1/4')
+
+    const refreshBtn = screen.getByRole('button', { name: 'Refresh lobby' })
+    expect(refreshBtn).toBeInTheDocument()
+
+    fireEvent.click(refreshBtn)
+
+    await waitFor(() => expect(screen.getByText('Entries: 2/4')).toBeInTheDocument())
+    expect(mockFetch).toHaveBeenCalledTimes(4)
+  })
+
+  it('does not show Refresh lobby data button on non-recoverable conflict (already_entered)', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: tournamentsFixture })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: false,
+          status: 409,
+          statusText: 'Conflict',
+          textBody: JSON.stringify({
+            code: 'already_entered',
+            message: 'Agent is already entered in tournament.',
+          }),
+        })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Debate on deterministic mocks')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Tournament' }))
+
+    expect(
+      await screen.findByText('This agent is already entered in the selected tournament.')
+    ).toBeInTheDocument()
+    // No refresh button for already_entered (not recoverable)
+    expect(screen.queryByRole('button', { name: 'Refresh lobby data' })).not.toBeInTheDocument()
+  })
+
+  it('syncs fullTournamentIds from backend on refresh when tournament becomes full', async () => {
+    const nowFullTournament = [
+      {
+        ...tournamentsFixture[0],
+        currentEntries: 4,
+        canEnter: false,
+        entryState: 'CAPACITY_REACHED' as const,
+        entryStateReason: 'Tournament is at full capacity.',
+      },
+    ]
+
+    mockFetch
+      // initial load - tournament is open
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: tournamentsFixture })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+      // refresh returns full tournament
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: nowFullTournament })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Entries: 1/4')
+    expect(screen.getByRole('button', { name: 'Enter Tournament' })).toBeEnabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh lobby' }))
+
+    await waitFor(() => expect(screen.getByText('Full')).toBeInTheDocument())
+    expect(screen.getByText('Entries: 4/4')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Enter Tournament' })).toBeDisabled()
   })
 })
