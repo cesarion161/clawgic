@@ -162,9 +162,10 @@ describe('LiveBattleArenaPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Bracket')).toBeInTheDocument()
     })
-    expect(screen.getByText('Semifinal 1')).toBeInTheDocument()
-    expect(screen.getByText('Semifinal 2')).toBeInTheDocument()
-    expect(screen.getByText('Final')).toBeInTheDocument()
+    // Semifinal 1/2 appear in both bracket cards and tournament progress indicator
+    expect(screen.getAllByText('Semifinal 1').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Semifinal 2').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Final').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders agent names in bracket cards', async () => {
@@ -397,11 +398,24 @@ describe('LiveBattleArenaPage', () => {
   it('clicking a bracket card selects that match', async () => {
     render(<LiveBattleArenaPage params={paramsPromise} />)
     await waitFor(() => {
-      expect(screen.getByText('Semifinal 2')).toBeInTheDocument()
+      expect(screen.getAllByText('Semifinal 2').length).toBeGreaterThanOrEqual(1)
     })
 
+    // Wait for initial match detail load to settle
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/clawgic/matches/match-sf1'),
+        expect.anything()
+      )
+    })
+
+    // Clear fetch spy to isolate the SF2 click's fetch calls
+    mockFetch.mockClear()
+
     const sf2Button = screen.getByRole('button', { name: /Semifinal 2/i })
-    fireEvent.click(sf2Button)
+    await act(async () => {
+      fireEvent.click(sf2Button)
+    })
 
     // Should trigger a new match detail fetch for match-sf2
     await waitFor(() => {
@@ -473,6 +487,123 @@ describe('LiveBattleArenaPage', () => {
       // The bracket card for SF1 should show winner label
       const winnerTexts = screen.getAllByText('Winner: AlphaBot')
       expect(winnerTexts.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('renders MatchStatusBadge with pulsing indicator for in-progress match in bracket', async () => {
+    render(<LiveBattleArenaPage params={paramsPromise} />)
+    await waitFor(() => {
+      const badges = screen.getAllByTestId('match-status-badge')
+      const inProgressBadge = badges.find((b) => b.getAttribute('data-status') === 'IN_PROGRESS')
+      expect(inProgressBadge).toBeInTheDocument()
+      expect(inProgressBadge?.querySelector('.animate-pulse')).toBeInTheDocument()
+    })
+  })
+
+  it('renders MatchStatusBadge with spinner for pending_judge match in bracket', async () => {
+    const pendingBracketStatus = {
+      ...sampleLiveStatus,
+      bracket: [
+        { ...sampleLiveStatus.bracket[0], status: 'PENDING_JUDGE', phase: 'CONCLUSION' },
+        sampleLiveStatus.bracket[1],
+        sampleLiveStatus.bracket[2],
+      ],
+    }
+    setupFetch(pendingBracketStatus, sampleMatchDetail)
+
+    render(<LiveBattleArenaPage params={paramsPromise} />)
+    await waitFor(() => {
+      const badges = screen.getAllByTestId('match-status-badge')
+      const pendingBadge = badges.find((b) => b.getAttribute('data-status') === 'PENDING_JUDGE')
+      expect(pendingBadge).toBeInTheDocument()
+      expect(pendingBadge?.querySelector('.animate-spin')).toBeInTheDocument()
+    })
+  })
+
+  it('renders MatchStatusBadge with winner name for completed match in detail', async () => {
+    const completedMatchDetail = {
+      ...sampleMatchDetail,
+      status: 'COMPLETED',
+      winnerAgentId: 'aaaa-1111',
+      judgements: [],
+    }
+
+    setupFetch(sampleLiveStatus, completedMatchDetail)
+
+    render(<LiveBattleArenaPage params={paramsPromise} />)
+    await waitFor(() => {
+      const badges = screen.getAllByTestId('match-status-badge')
+      const completedBadge = badges.find((b) => b.getAttribute('data-status') === 'COMPLETED')
+      expect(completedBadge).toBeInTheDocument()
+      expect(completedBadge).toHaveTextContent('AlphaBot')
+    })
+  })
+
+  it('renders tournament progress indicator', async () => {
+    render(<LiveBattleArenaPage params={paramsPromise} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('tournament-progress')).toBeInTheDocument()
+    })
+  })
+
+  it('renders tournament progress with active semifinal 1 stage', async () => {
+    render(<LiveBattleArenaPage params={paramsPromise} />)
+    await waitFor(() => {
+      const stage0 = screen.getByTestId('stage-0')
+      expect(stage0.querySelector('.bg-blue-500')).toBeInTheDocument()
+    })
+  })
+
+  it('renders judge scores section with flash animation class', async () => {
+    const completedMatchDetail = {
+      ...sampleMatchDetail,
+      status: 'COMPLETED',
+      winnerAgentId: 'aaaa-1111',
+      judgements: [
+        {
+          judgementId: 'j1',
+          matchId: 'match-sf1',
+          judgeKey: 'default',
+          status: 'ACCEPTED',
+          attempt: 1,
+          winnerAgentId: 'aaaa-1111',
+          agent1LogicScore: 8,
+          agent1PersonaAdherenceScore: 7,
+          agent1RebuttalStrengthScore: 9,
+          agent2LogicScore: 6,
+          agent2PersonaAdherenceScore: 7,
+          agent2RebuttalStrengthScore: 5,
+          reasoning: 'Strong logic.',
+        },
+      ],
+    }
+    setupFetch(sampleLiveStatus, completedMatchDetail)
+
+    render(<LiveBattleArenaPage params={paramsPromise} />)
+    await waitFor(() => {
+      const section = screen.getByTestId('judge-scores-section')
+      expect(section).toBeInTheDocument()
+      expect(section.className).toContain('judge-scores-flash')
+    })
+  })
+
+  it('renders bracket advancement class on completed match card', async () => {
+    const advancedBracketStatus = {
+      ...sampleLiveStatus,
+      activeMatchId: 'match-sf2',
+      bracket: [
+        { ...sampleLiveStatus.bracket[0], status: 'COMPLETED', winnerAgentId: 'aaaa-1111' },
+        { ...sampleLiveStatus.bracket[1], status: 'IN_PROGRESS', phase: 'THESIS_DISCOVERY' },
+        sampleLiveStatus.bracket[2],
+      ],
+    }
+    setupFetch(advancedBracketStatus, sampleMatchDetail)
+
+    render(<LiveBattleArenaPage params={paramsPromise} />)
+    await waitFor(() => {
+      // The SF1 card (completed, not selected since active is SF2) should have bracket-advance class
+      const sf1Button = screen.getByRole('button', { name: /Semifinal 1/i })
+      expect(sf1Button.className).toContain('bracket-advance')
     })
   })
 })

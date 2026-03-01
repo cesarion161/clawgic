@@ -244,6 +244,36 @@
     animation: battle-message-enter 300ms ease-out both;
   }
 
+  @keyframes judge-scores-flash {
+    0% {
+      background-color: rgb(16 185 129 / 0.2);
+      box-shadow: 0 0 20px rgb(16 185 129 / 0.3);
+    }
+    100% {
+      background-color: transparent;
+      box-shadow: none;
+    }
+  }
+
+  .judge-scores-flash {
+    animation: judge-scores-flash 1.2s ease-out both;
+  }
+
+  @keyframes bracket-advance {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .bracket-advance {
+    animation: bracket-advance 400ms ease-out both;
+  }
+
   @keyframes clawgic-fade-up {
     from {
       opacity: 0;

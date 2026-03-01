@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import CountdownTimer from '@/components/countdown-timer'
 import BattleView from '@/components/battle-view'
+import MatchStatusBadge from '@/components/match-status-badge'
+import TournamentProgressIndicator from '@/components/tournament-progress-indicator'
 
 type BracketMatchStatus = {
   matchId: string
@@ -84,22 +86,6 @@ const POLL_INTERVAL_MS = 3000
 
 const DEBATE_PHASES = ['THESIS_DISCOVERY', 'ARGUMENTATION', 'COUNTER_ARGUMENTATION', 'CONCLUSION']
 
-function matchStatusBadge(status: string): { label: string; className: string } {
-  switch (status) {
-    case 'SCHEDULED':
-      return { label: 'Waiting', className: 'border-slate-400/40 bg-slate-50 text-slate-700' }
-    case 'IN_PROGRESS':
-      return { label: 'Battling', className: 'border-blue-400/40 bg-blue-50 text-blue-800' }
-    case 'PENDING_JUDGE':
-      return { label: 'Awaiting Judge', className: 'border-amber-400/40 bg-amber-50 text-amber-800' }
-    case 'COMPLETED':
-      return { label: 'Judged', className: 'border-emerald-400/40 bg-emerald-50 text-emerald-800' }
-    case 'FORFEITED':
-      return { label: 'Forfeited', className: 'border-red-400/40 bg-red-50 text-red-800' }
-    default:
-      return { label: status, className: 'border-slate-400/40 bg-slate-50 text-slate-700' }
-  }
-}
 
 function tournamentStatusBadge(status: string): { label: string; className: string } {
   switch (status) {
@@ -386,7 +372,14 @@ export default function LiveBattleArenaPage({
 
       {/* Bracket Overview */}
       <section className="clawgic-surface clawgic-reveal p-6 sm:p-7" style={{ animationDelay: '80ms' }}>
-        <h2 className="text-lg font-semibold">Bracket</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Bracket</h2>
+          <TournamentProgressIndicator
+            bracket={liveStatus.bracket}
+            activeMatchId={liveStatus.activeMatchId}
+            resolveAgentName={resolveAgentName}
+          />
+        </div>
         {liveStatus.bracket.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No matches generated yet.</p>
         ) : (
@@ -440,10 +433,11 @@ export default function LiveBattleArenaPage({
                   {formatPhase(matchDetail.phase)}
                 </span>
               ) : null}
-              {(() => {
-                const badge = matchStatusBadge(matchDetail.status)
-                return <span className={`clawgic-badge ${badge.className}`}>{badge.label}</span>
-              })()}
+              <MatchStatusBadge
+                status={matchDetail.status}
+                winnerName={matchDetail.winnerAgentId ? resolveAgentName(matchDetail.winnerAgentId) : null}
+                forfeitReason={matchDetail.forfeitReason}
+              />
             </div>
           </div>
 
@@ -454,7 +448,7 @@ export default function LiveBattleArenaPage({
 
           {/* Judge Scores */}
           {acceptedJudgement ? (
-            <div className="mt-4 rounded-2xl border border-border/70 bg-background/75 p-4">
+            <div className="mt-4 rounded-2xl border border-border/70 bg-background/75 p-4 judge-scores-flash" data-testid="judge-scores-section">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Judge Scores</h3>
               <div className="mt-2 overflow-x-auto">
                 <table className="min-w-full text-sm">
@@ -563,7 +557,7 @@ function BracketMatchCard({
     )
   }
 
-  const badge = matchStatusBadge(match.status)
+  const isCompleted = match.status === 'COMPLETED' || match.status === 'FORFEITED'
 
   return (
     <button
@@ -574,13 +568,20 @@ function BracketMatchCard({
           ? 'border-primary bg-primary/5 shadow-md'
           : isActive
             ? 'border-blue-400 bg-blue-50/50 shadow-sm'
-            : 'border-border/60 bg-white/90 hover:border-primary/40 hover:shadow-sm'
+            : isCompleted && match.winnerAgentId
+              ? 'border-emerald-300 bg-emerald-50/30 hover:border-emerald-400 hover:shadow-sm bracket-advance'
+              : 'border-border/60 bg-white/90 hover:border-primary/40 hover:shadow-sm'
       }`}
       aria-label={`${label}: ${resolveAgentName(match.agent1Id)} vs ${resolveAgentName(match.agent2Id)}`}
     >
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">{label}</h3>
-        <span className={`clawgic-badge text-[10px] ${badge.className}`}>{badge.label}</span>
+        <MatchStatusBadge
+          status={match.status}
+          winnerName={match.winnerAgentId ? resolveAgentName(match.winnerAgentId) : null}
+          forfeitReason={null}
+          size="sm"
+        />
       </div>
       <div className="mt-2 space-y-1 text-sm">
         <p className={match.winnerAgentId === match.agent1Id ? 'font-semibold text-emerald-800' : 'text-muted-foreground'}>
