@@ -609,6 +609,46 @@ run_entry_and_bracket_checks() {
   fi
 }
 
+run_match_endpoint_checks() {
+  # GET /api/clawgic/matches/{matchId} — not found for unknown match
+  assert_request "match-detail-not-found" "GET" \
+    "/api/clawgic/matches/${UNKNOWN_UUID}" \
+    "404" \
+    ""
+
+  # GET /api/clawgic/tournaments/{tournamentId}/matches — for existing tournament
+  if [[ -n "${SMOKE_TOURNAMENT_ID}" ]]; then
+    assert_request "tournament-matches-list" "GET" \
+      "/api/clawgic/tournaments/${SMOKE_TOURNAMENT_ID}/matches" \
+      "200" \
+      ""
+  fi
+
+  # GET /api/clawgic/tournaments/{tournamentId}/matches — not found for unknown tournament
+  assert_request "tournament-matches-not-found" "GET" \
+    "/api/clawgic/tournaments/${UNKNOWN_UUID}/matches" \
+    "404" \
+    ""
+
+  # GET /api/clawgic/tournaments/{tournamentId}/live — for existing tournament
+  if [[ -n "${SMOKE_TOURNAMENT_ID}" ]]; then
+    assert_request "tournament-live-status" "GET" \
+      "/api/clawgic/tournaments/${SMOKE_TOURNAMENT_ID}/live" \
+      "200" \
+      ""
+    if [[ "${LAST_REQUEST_MATCHED_EXPECTED}" == "true" ]]; then
+      assert_body_contains "tournament-live-has-server-time" '"serverTime"'
+      assert_body_contains "tournament-live-has-bracket" '"bracket"'
+    fi
+  fi
+
+  # GET /api/clawgic/tournaments/{tournamentId}/live — not found for unknown tournament
+  assert_request "tournament-live-not-found" "GET" \
+    "/api/clawgic/tournaments/${UNKNOWN_UUID}/live" \
+    "404" \
+    ""
+}
+
 print_summary_and_exit() {
   printf '\nSummary: %s passed, %s failed\n' "${PASS_COUNT}" "${FAIL_COUNT}"
   if [[ "${FAIL_COUNT}" -gt 0 ]]; then
@@ -630,6 +670,7 @@ main() {
   run_tournament_crud_checks
   run_lobby_eligibility_checks
   run_entry_and_bracket_checks
+  run_match_endpoint_checks
   print_summary_and_exit
 }
 

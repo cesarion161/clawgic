@@ -33,7 +33,7 @@ That means:
 Required for active Clawgic backend/frontend work:
 - Docker Engine + Docker Compose v2 (PostgreSQL)
 - Java 25 (backend toolchain target)
-- Node.js 23.x (frontend)
+- Node.js 24.x (frontend)
 - npm 10.x or 11.x
 
 Optional / legacy-only (not needed for Clawgic MVP):

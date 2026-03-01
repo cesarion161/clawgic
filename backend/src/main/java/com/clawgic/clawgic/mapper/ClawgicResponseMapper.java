@@ -394,6 +394,27 @@ public class ClawgicResponseMapper {
                 .toList();
     }
 
+    public ClawgicTournamentResponses.BracketMatchStatus toBracketMatchStatusResponse(ClawgicMatch match) {
+        return new ClawgicTournamentResponses.BracketMatchStatus(
+                match.getMatchId(),
+                match.getStatus(),
+                match.getPhase(),
+                match.getAgent1Id(),
+                match.getAgent2Id(),
+                match.getWinnerAgentId(),
+                match.getBracketRound(),
+                match.getBracketPosition()
+        );
+    }
+
+    public List<ClawgicTournamentResponses.BracketMatchStatus> toBracketMatchStatusResponses(
+            Collection<ClawgicMatch> matches
+    ) {
+        return matches.stream()
+                .map(this::toBracketMatchStatusResponse)
+                .toList();
+    }
+
     public ClawgicPaymentResponses.StakingLedgerDetail toStakingLedgerDetailResponse(ClawgicStakingLedger ledger) {
         return new ClawgicPaymentResponses.StakingLedgerDetail(
                 ledger.getStakeId(),

@@ -1,7 +1,9 @@
 package com.clawgic.clawgic.dto;
 
+import com.clawgic.clawgic.model.ClawgicMatchStatus;
 import com.clawgic.clawgic.model.ClawgicTournamentEntryStatus;
 import com.clawgic.clawgic.model.ClawgicTournamentStatus;
+import com.clawgic.clawgic.model.DebatePhase;
 import com.clawgic.clawgic.model.TournamentEntryState;
 
 import java.math.BigDecimal;
@@ -72,6 +74,33 @@ public final class ClawgicTournamentResponses {
             List<TournamentEntry> entries,
             List<ClawgicMatchResponses.MatchDetail> matches,
             List<ClawgicPaymentResponses.StakingLedgerSummary> settlement
+    ) {
+    }
+
+    public record BracketMatchStatus(
+            UUID matchId,
+            ClawgicMatchStatus status,
+            DebatePhase phase,
+            UUID agent1Id,
+            UUID agent2Id,
+            UUID winnerAgentId,
+            Integer bracketRound,
+            Integer bracketPosition
+    ) {
+    }
+
+    public record TournamentLiveStatus(
+            UUID tournamentId,
+            String topic,
+            ClawgicTournamentStatus status,
+            OffsetDateTime startTime,
+            OffsetDateTime entryCloseTime,
+            OffsetDateTime serverTime,
+            UUID activeMatchId,
+            UUID tournamentWinnerAgentId,
+            Integer matchesCompleted,
+            Integer matchesForfeited,
+            List<BracketMatchStatus> bracket
     ) {
     }
 }

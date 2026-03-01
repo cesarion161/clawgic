@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiRequestError, apiClient } from '@/lib/api-client'
 import { buildSignedX402PaymentHeader, parseX402Challenge } from '@/lib/x402-payment'
+import CountdownTimer from '@/components/countdown-timer'
 
 type TournamentEntryState = 'OPEN' | 'ENTRY_WINDOW_CLOSED' | 'TOURNAMENT_NOT_OPEN' | 'CAPACITY_REACHED'
 
@@ -141,6 +142,7 @@ export default function ClawgicTournamentLobbyPage() {
   const [submittingTournamentId, setSubmittingTournamentId] = useState<string | null>(null)
   const [enteredAgentIdsByTournament, setEnteredAgentIdsByTournament] = useState<Record<string, string[]>>({})
   const [fullTournamentIds, setFullTournamentIds] = useState<Record<string, boolean>>({})
+  const [expiredTournamentIds, setExpiredTournamentIds] = useState<Record<string, boolean>>({})
 
   const refreshLobbyData = useCallback(async () => {
     const [fetchedTournaments, fetchedAgents] = await Promise.all([
@@ -481,7 +483,9 @@ export default function ClawgicTournamentLobbyPage() {
           const banner = entryBannerByTournament[tournamentId]
           const isFull = !!fullTournamentIds[tournamentId]
           const backendNotEnterable = tournament.canEnter === false
-          const canSubmit = agents.length > 0 && !isSubmitting && !isFull && !backendNotEnterable
+          const clientExpired = !!expiredTournamentIds[tournamentId]
+          const isInProgressOrLocked = tournament.status === 'LOCKED' || tournament.status === 'IN_PROGRESS'
+          const canSubmit = agents.length > 0 && !isSubmitting && !isFull && !backendNotEnterable && !clientExpired
           const badge = entryStateBadge(tournament)
           const entriesDisplay =
             tournament.currentEntries != null
@@ -503,8 +507,30 @@ export default function ClawgicTournamentLobbyPage() {
                     <p>Entries: {entriesDisplay}</p>
                     <p>Entry fee: {formatUsdc(tournament.baseEntryFeeUsdc)}</p>
                     <p>Starts: {formatDateTime(tournament.startTime)}</p>
-                    <p>Entry closes: {formatDateTime(tournament.entryCloseTime)}</p>
+                    <p>
+                      Entry closes:{' '}
+                      {isInProgressOrLocked ? (
+                        'Closed'
+                      ) : (
+                        <CountdownTimer
+                          targetTime={tournament.entryCloseTime}
+                          onExpired={() => {
+                            setExpiredTournamentIds((prev) => ({ ...prev, [tournamentId]: true }))
+                            refreshLobbyData().catch(() => {})
+                          }}
+                          className="text-sm"
+                        />
+                      )}
+                    </p>
                   </div>
+                  {isInProgressOrLocked ? (
+                    <Link
+                      href={`/clawgic/tournaments/${tournamentId}/live`}
+                      className="mt-1 inline-block text-sm font-medium text-primary underline decoration-primary/40 hover:decoration-primary/70"
+                    >
+                      Watch Live
+                    </Link>
+                  ) : null}
                 </div>
                 <span
                   className={`clawgic-badge ${badge.className}`}
@@ -531,7 +557,7 @@ export default function ClawgicTournamentLobbyPage() {
                         [tournamentId]: event.target.value,
                       }))
                     }
-                    disabled={agents.length === 0 || isSubmitting || backendNotEnterable}
+                    disabled={agents.length === 0 || isSubmitting || backendNotEnterable || clientExpired}
                     className="clawgic-select"
                     aria-label={`Select agent for ${tournament.topic}`}
                   >
