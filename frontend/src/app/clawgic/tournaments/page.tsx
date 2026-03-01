@@ -5,15 +5,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { ApiRequestError, apiClient } from '@/lib/api-client'
 import { buildSignedX402PaymentHeader, parseX402Challenge } from '@/lib/x402-payment'
 
+type TournamentEntryState = 'OPEN' | 'ENTRY_WINDOW_CLOSED' | 'TOURNAMENT_NOT_OPEN' | 'CAPACITY_REACHED'
+
 type ClawgicTournamentSummary = {
   tournamentId: string
   topic: string
   status: string
   bracketSize: number
   maxEntries: number
+  currentEntries: number | null
   startTime: string
   entryCloseTime: string
   baseEntryFeeUsdc: number | string
+  canEnter: boolean | null
+  entryState: TournamentEntryState | null
+  entryStateReason: string | null
 }
 
 type ClawgicAgentSummary = {
@@ -58,26 +64,64 @@ function formatUsdc(value: number | string): string {
   return `${numericValue.toFixed(2)} USDC`
 }
 
-function classifyEntryConflict(error: ApiRequestError): EntryBanner {
-  const detail = `${error.detail || ''} ${error.body || ''}`.toLowerCase()
-
-  if (detail.includes('capacity') || detail.includes('full')) {
-    return {
-      tone: 'warning',
-      message: 'Tournament is full. Choose another tournament or wait for a new round.',
-    }
+function parseConflictCode(error: ApiRequestError): string | undefined {
+  try {
+    const parsed = JSON.parse(error.body) as { code?: string }
+    return parsed.code
+  } catch {
+    return undefined
   }
+}
 
-  if (detail.includes('already entered') || detail.includes('already')) {
-    return {
-      tone: 'warning',
-      message: 'This agent is already entered in the selected tournament.',
-    }
+const CONFLICT_CODE_BANNERS: Record<string, EntryBanner> = {
+  capacity_reached: {
+    tone: 'warning',
+    message: 'Tournament is full. Choose another tournament or wait for a new round.',
+  },
+  already_entered: {
+    tone: 'warning',
+    message: 'This agent is already entered in the selected tournament.',
+  },
+  entry_window_closed: {
+    tone: 'warning',
+    message: 'Entry window has closed for this tournament.',
+  },
+  tournament_not_open: {
+    tone: 'warning',
+    message: 'This tournament is not open for entries.',
+  },
+  invalid_agent: {
+    tone: 'error',
+    message: 'Agent not found. Refresh and try again.',
+  },
+}
+
+function classifyEntryConflict(error: ApiRequestError): EntryBanner {
+  const code = parseConflictCode(error)
+  if (code && CONFLICT_CODE_BANNERS[code]) {
+    return CONFLICT_CODE_BANNERS[code]
   }
 
   return {
     tone: 'error',
     message: 'Tournament entry conflict. Refresh and try again.',
+  }
+}
+
+function entryStateBadge(tournament: ClawgicTournamentSummary): { label: string; className: string } {
+  if (tournament.canEnter === true) {
+    return { label: 'Open', className: 'border-emerald-400/40 bg-emerald-50 text-emerald-800' }
+  }
+
+  switch (tournament.entryState) {
+    case 'CAPACITY_REACHED':
+      return { label: 'Full', className: 'border-amber-400/40 bg-amber-50 text-amber-800' }
+    case 'ENTRY_WINDOW_CLOSED':
+      return { label: 'Closed', className: 'border-slate-400/40 bg-slate-50 text-slate-700' }
+    case 'TOURNAMENT_NOT_OPEN':
+      return { label: 'Locked', className: 'border-slate-400/40 bg-slate-50 text-slate-700' }
+    default:
+      return { label: 'Open', className: 'border-emerald-400/40 bg-emerald-50 text-emerald-800' }
   }
 }
 
@@ -197,25 +241,24 @@ export default function ClawgicTournamentLobbyPage() {
   }
 
   function handleEntryError(tournamentId: string, error: unknown) {
-    if (error instanceof ApiRequestError && error.status === 409) {
+    if (error instanceof ApiRequestError && (error.status === 409 || error.status === 404)) {
       const conflict = classifyEntryConflict(error)
-      if (conflict.tone === 'warning' && conflict.message.toLowerCase().includes('full')) {
+      const code = parseConflictCode(error)
+      if (code === 'capacity_reached') {
         setFullTournamentIds((previous) => ({ ...previous, [tournamentId]: true }))
+      }
+      if (code === 'already_entered') {
+        const selectedAgentId = selectedAgentByTournament[tournamentId]
+        if (selectedAgentId) {
+          setEnteredAgentIdsByTournament((previous) => ({
+            ...previous,
+            [tournamentId]: [...(previous[tournamentId] || []), selectedAgentId],
+          }))
+        }
       }
       setEntryBannerByTournament((previous) => ({
         ...previous,
         [tournamentId]: conflict,
-      }))
-      return
-    }
-
-    if (error instanceof ApiRequestError && error.status === 404) {
-      setEntryBannerByTournament((previous) => ({
-        ...previous,
-        [tournamentId]: {
-          tone: 'error',
-          message: 'Tournament or agent was not found. Refresh data and try again.',
-        },
       }))
       return
     }
@@ -393,7 +436,13 @@ export default function ClawgicTournamentLobbyPage() {
           const selectedAgentId = selectedAgentByTournament[tournamentId] || ''
           const banner = entryBannerByTournament[tournamentId]
           const isFull = !!fullTournamentIds[tournamentId]
-          const canSubmit = agents.length > 0 && !isSubmitting && !isFull
+          const backendNotEnterable = tournament.canEnter === false
+          const canSubmit = agents.length > 0 && !isSubmitting && !isFull && !backendNotEnterable
+          const badge = entryStateBadge(tournament)
+          const entriesDisplay =
+            tournament.currentEntries != null
+              ? `${tournament.currentEntries}/${tournament.maxEntries}`
+              : `${tournament.maxEntries} max`
 
           return (
             <article
@@ -407,16 +456,25 @@ export default function ClawgicTournamentLobbyPage() {
                   <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
                     <p>Status: {tournament.status}</p>
                     <p>Bracket size: {tournament.bracketSize}</p>
-                    <p>Max entries: {tournament.maxEntries}</p>
+                    <p>Entries: {entriesDisplay}</p>
                     <p>Entry fee: {formatUsdc(tournament.baseEntryFeeUsdc)}</p>
                     <p>Starts: {formatDateTime(tournament.startTime)}</p>
                     <p>Entry closes: {formatDateTime(tournament.entryCloseTime)}</p>
                   </div>
                 </div>
-                <span className="clawgic-badge border-primary/30 bg-primary/10 text-accent-foreground">
-                  {isFull ? 'Full' : 'Open'}
+                <span
+                  className={`clawgic-badge ${badge.className}`}
+                  data-entry-state={tournament.entryState || 'UNKNOWN'}
+                >
+                  {badge.label}
                 </span>
               </div>
+
+              {backendNotEnterable && tournament.entryStateReason ? (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {tournament.entryStateReason}
+                </p>
+              ) : null}
 
               <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
                 <label className="grid gap-2 text-sm">
@@ -429,7 +487,7 @@ export default function ClawgicTournamentLobbyPage() {
                         [tournamentId]: event.target.value,
                       }))
                     }
-                    disabled={agents.length === 0 || isSubmitting}
+                    disabled={agents.length === 0 || isSubmitting || backendNotEnterable}
                     className="clawgic-select"
                     aria-label={`Select agent for ${tournament.topic}`}
                   >

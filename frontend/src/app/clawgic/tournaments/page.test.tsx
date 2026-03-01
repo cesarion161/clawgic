@@ -19,9 +19,13 @@ const tournamentsFixture = [
     status: 'SCHEDULED',
     bracketSize: 4,
     maxEntries: 4,
+    currentEntries: 1,
     startTime: '2026-03-01T14:00:00Z',
     entryCloseTime: '2026-03-01T13:00:00Z',
     baseEntryFeeUsdc: '5.000000',
+    canEnter: true,
+    entryState: 'OPEN',
+    entryStateReason: null,
   },
 ]
 
@@ -101,7 +105,9 @@ describe('ClawgicTournamentLobbyPage', () => {
     expect(screen.getByText('Loading tournament lobby...')).toBeInTheDocument()
     expect(await screen.findByText('Debate on deterministic mocks')).toBeInTheDocument()
     expect(screen.getByText('Status: SCHEDULED')).toBeInTheDocument()
+    expect(screen.getByText('Entries: 1/4')).toBeInTheDocument()
     expect(screen.getByText('Entry fee: 5.00 USDC')).toBeInTheDocument()
+    expect(screen.getByText('Open')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Enter Tournament' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Enter Tournament' })).toHaveClass('clawgic-primary-btn')
     expect(
@@ -347,7 +353,8 @@ describe('ClawgicTournamentLobbyPage', () => {
           status: 409,
           statusText: 'Conflict',
           textBody: JSON.stringify({
-            detail: 'Tournament entry capacity reached: 00000000-0000-0000-0000-000000000901',
+            code: 'capacity_reached',
+            message: 'Tournament entry capacity reached: 00000000-0000-0000-0000-000000000901',
           }),
         })
       )
@@ -364,7 +371,6 @@ describe('ClawgicTournamentLobbyPage', () => {
       expect(screen.getByRole('button', { name: 'Enter Tournament' })).toBeDisabled()
     )
     expect(screen.getByRole('button', { name: 'Enter Tournament' })).toHaveClass('clawgic-primary-btn')
-    expect(screen.getByText('Full')).toBeInTheDocument()
   })
 
   it('shows duplicate-entry messaging when entry API returns duplicate conflict', async () => {
@@ -391,7 +397,8 @@ describe('ClawgicTournamentLobbyPage', () => {
           status: 409,
           statusText: 'Conflict',
           textBody: JSON.stringify({
-            detail: 'Agent is already entered in tournament: 00000000-0000-0000-0000-000000000901',
+            code: 'already_entered',
+            message: 'Agent is already entered in tournament: 00000000-0000-0000-0000-000000000901',
           }),
         })
       )
@@ -406,7 +413,7 @@ describe('ClawgicTournamentLobbyPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows generic conflict banner for non-capacity and non-duplicate 409 responses', async () => {
+  it('shows entry-window-closed messaging when entry API returns entry_window_closed conflict code', async () => {
     mockFetch
       .mockResolvedValueOnce(
         mockResponse({
@@ -430,7 +437,45 @@ describe('ClawgicTournamentLobbyPage', () => {
           status: 409,
           statusText: 'Conflict',
           textBody: JSON.stringify({
-            detail: 'Tournament entry window is closed: 00000000-0000-0000-0000-000000000901',
+            code: 'entry_window_closed',
+            message: 'Tournament entry window is closed: 00000000-0000-0000-0000-000000000901',
+          }),
+        })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Debate on deterministic mocks')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Tournament' }))
+
+    expect(await screen.findByText('Entry window has closed for this tournament.')).toBeInTheDocument()
+  })
+
+  it('shows generic conflict banner when 409 has no recognized conflict code', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          jsonBody: tournamentsFixture,
+        })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          jsonBody: agentsFixture,
+        })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: false,
+          status: 409,
+          statusText: 'Conflict',
+          textBody: JSON.stringify({
+            detail: 'Some unknown conflict reason',
           }),
         })
       )
@@ -441,5 +486,149 @@ describe('ClawgicTournamentLobbyPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enter Tournament' }))
 
     expect(await screen.findByText('Tournament entry conflict. Refresh and try again.')).toBeInTheDocument()
+  })
+
+  it('renders disabled button and Closed badge when backend says entry window is closed', async () => {
+    const closedTournament = [
+      {
+        ...tournamentsFixture[0],
+        canEnter: false,
+        entryState: 'ENTRY_WINDOW_CLOSED',
+        entryStateReason: 'Entry window has closed.',
+      },
+    ]
+
+    mockFetch
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: closedTournament })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Debate on deterministic mocks')
+
+    expect(screen.getByText('Closed')).toBeInTheDocument()
+    expect(screen.getByText('Entry window has closed.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Enter Tournament' })).toBeDisabled()
+    expect(
+      screen.getByRole('combobox', { name: /Select agent for Debate on deterministic mocks/i })
+    ).toBeDisabled()
+  })
+
+  it('renders disabled button and Locked badge when backend says tournament is not open', async () => {
+    const lockedTournament = [
+      {
+        ...tournamentsFixture[0],
+        status: 'LOCKED',
+        canEnter: false,
+        entryState: 'TOURNAMENT_NOT_OPEN',
+        entryStateReason: 'Tournament is locked and no longer accepting entries.',
+      },
+    ]
+
+    mockFetch
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: lockedTournament })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Debate on deterministic mocks')
+
+    expect(screen.getByText('Locked')).toBeInTheDocument()
+    expect(screen.getByText('Tournament is locked and no longer accepting entries.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Enter Tournament' })).toBeDisabled()
+  })
+
+  it('renders disabled button and Full badge when backend says capacity is reached', async () => {
+    const fullTournament = [
+      {
+        ...tournamentsFixture[0],
+        currentEntries: 4,
+        canEnter: false,
+        entryState: 'CAPACITY_REACHED',
+        entryStateReason: 'Tournament is at full capacity.',
+      },
+    ]
+
+    mockFetch
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: fullTournament })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Debate on deterministic mocks')
+
+    expect(screen.getByText('Full')).toBeInTheDocument()
+    expect(screen.getByText('Entries: 4/4')).toBeInTheDocument()
+    expect(screen.getByText('Tournament is at full capacity.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Enter Tournament' })).toBeDisabled()
+  })
+
+  it('does not send entry request when button is disabled for non-enterable tournament', async () => {
+    const closedTournament = [
+      {
+        ...tournamentsFixture[0],
+        canEnter: false,
+        entryState: 'ENTRY_WINDOW_CLOSED',
+        entryStateReason: 'Entry window has closed.',
+      },
+    ]
+
+    mockFetch
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: closedTournament })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Debate on deterministic mocks')
+
+    const button = screen.getByRole('button', { name: 'Enter Tournament' })
+    expect(button).toBeDisabled()
+
+    fireEvent.click(button)
+
+    // No additional fetch calls beyond the initial 2 (tournaments + agents)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows tournament_not_open messaging when entry API returns tournament_not_open conflict code', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: tournamentsFixture })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ ok: true, status: 200, statusText: 'OK', jsonBody: agentsFixture })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({
+          ok: false,
+          status: 409,
+          statusText: 'Conflict',
+          textBody: JSON.stringify({
+            code: 'tournament_not_open',
+            message: 'Tournament is not open for entries.',
+          }),
+        })
+      )
+
+    render(<ClawgicTournamentLobbyPage />)
+    await screen.findByText('Debate on deterministic mocks')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Tournament' }))
+
+    expect(
+      await screen.findByText('This tournament is not open for entries.')
+    ).toBeInTheDocument()
   })
 })
